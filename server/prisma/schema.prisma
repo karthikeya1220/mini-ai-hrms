@@ -1,0 +1,159 @@
+// =============================================================================
+// Prisma Schema — Mini AI-HRMS
+// Source of truth: SPEC.md § 2.3 (Database Schema)
+//
+// Rules enforced:
+//   - Every table / column maps exactly to the SQL definition in the SPEC.
+//   - All FK relations are explicit (with onDelete behaviour matching the spec).
+//   - All five indexes cited in the SPEC are reproduced as @@index directives.
+//   - No fields are added beyond what the SPEC defines.
+//   - Field naming: camelCase in Prisma, snake_case via @map / @@map for DB.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORGANIZATIONS  (Tenants)
+// SPEC: organizations table
+// ─────────────────────────────────────────────────────────────────────────────
+model Organization {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   @db.VarChar(255)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  employees      Employee[]
+  tasks          Task[]
+  blockchainLogs BlockchainLog[]
+
+  @@map("organizations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPLOYEES
+// SPEC: employees table
+//   - Unique constraint: (org_id, email)
+//   - skills: TEXT[] in PostgreSQL
+//   - wallet_address: optional, max 42 chars (EVM address length)
+//   - is_active: soft-delete flag
+// ─────────────────────────────────────────────────────────────────────────────
+model Employee {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  name          String   @db.VarChar(255)
+  email         String   @db.VarChar(255)
+  role          String?  @db.VarChar(100)
+  department    String?  @db.VarChar(100)
+  skills        String[] // maps to TEXT[] in PostgreSQL
+  walletAddress String?  @map("wallet_address") @db.VarChar(42)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // FK: org_id → organizations(id) ON DELETE CASCADE
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Relations
+  tasks           Task[]
+  performanceLogs PerformanceLog[]
+
+  // SPEC: UNIQUE(org_id, email)
+  @@unique([orgId, email])
+  // SPEC: CREATE INDEX idx_employees_org ON employees(org_id)
+  @@index([orgId], name: "idx_employees_org")
+  @@map("employees")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASKS
+// SPEC: tasks table
+//   - priority:          VARCHAR(20) DEFAULT 'medium'  — low | medium | high
+//   - status:            VARCHAR(20) DEFAULT 'assigned' — assigned | in_progress | completed
+//   - complexity_score:  INTEGER DEFAULT 3             — 1 (simple) to 5 (complex)
+//   - required_skills:   TEXT[]
+//   - due_date / completed_at: optional
+// ─────────────────────────────────────────────────────────────────────────────
+model Task {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  assignedTo      String?   @map("assigned_to") @db.Uuid
+  title           String    @db.VarChar(255)
+  description     String?   @db.Text
+  priority        String    @default("medium") @db.VarChar(20)
+  status          String    @default("assigned") @db.VarChar(20)
+  complexityScore Int       @default(3) @map("complexity_score")
+  requiredSkills  String[]  @map("required_skills")
+  dueDate         DateTime? @map("due_date") @db.Timestamptz()
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  // FK: org_id → organizations(id) ON DELETE CASCADE
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // FK: assigned_to → employees(id)  (no CASCADE — employee soft-deleted, task remains)
+  employee Employee? @relation(fields: [assignedTo], references: [id])
+
+  // Relations
+  blockchainLogs BlockchainLog[]
+
+  // SPEC indexes:
+  //   CREATE INDEX idx_tasks_org      ON tasks(org_id)
+  //   CREATE INDEX idx_tasks_assigned ON tasks(assigned_to)
+  //   CREATE INDEX idx_tasks_status   ON tasks(status)
+  @@index([orgId], name: "idx_tasks_org")
+  @@index([assignedTo], name: "idx_tasks_assigned")
+  @@index([status], name: "idx_tasks_status")
+  @@map("tasks")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PERFORMANCE LOGS  (AI-generated scores)
+// SPEC: performance_logs table
+//   - score:     NUMERIC(5,2)  — e.g. 84.50
+//   - breakdown: JSONB         — { completionRate, onTimeRate, avgComplexity, … }
+// ─────────────────────────────────────────────────────────────────────────────
+model PerformanceLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  score      Decimal? @db.Decimal(5, 2)
+  breakdown  Json?    // maps to JSONB in PostgreSQL
+  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz()
+
+  // FK: employee_id → employees(id) ON DELETE CASCADE
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // SPEC: CREATE INDEX idx_perf_employee ON performance_logs(employee_id)
+  @@index([employeeId], name: "idx_perf_employee")
+  @@map("performance_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOCKCHAIN LOGS
+// SPEC: blockchain_logs table
+//   - tx_hash:    VARCHAR(66)  — 0x + 64 hex chars (Ethereum tx hash length)
+//   - event_type: VARCHAR(50) DEFAULT 'task_completed'
+// ─────────────────────────────────────────────────────────────────────────────
+model BlockchainLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  txHash     String   @map("tx_hash") @db.VarChar(66)
+  eventType  String   @default("task_completed") @map("event_type") @db.VarChar(50)
+  loggedAt   DateTime @default(now()) @map("logged_at") @db.Timestamptz()
+
+  // FK: org_id → organizations(id)   (no CASCADE — logs are audit records, preserve on org ops)
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  // FK: task_id → tasks(id)           (no CASCADE — same audit-preservation rationale)
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@map("blockchain_logs")
+}

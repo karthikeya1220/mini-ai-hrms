@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment — never commit real values
+.env
+
+# Prisma
+prisma/*.db
+prisma/migrations/*.sql  # only if you want to keep generated migrations out; remove this line if you do want them tracked
