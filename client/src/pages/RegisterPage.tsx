@@ -12,6 +12,7 @@ import { useState, useId } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiRegister } from '../api/auth';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { FloatingInput, LogoMark, Spinner, EyeIcon } from '../components/ui';
 
@@ -89,8 +90,15 @@ export default function RegisterPage() {
         setLoading(true);
         try {
             const data = await apiRegister({ name, email, password });
-            setSession(data.accessToken, data.org);
-            toast.success(`Welcome to mini-AI HRMS, ${data.org.name}! 🎉`, { duration: 4000 });
+
+            // Set session in Supabase SDK for future auto-refresh
+            await supabase.auth.setSession({
+                access_token: data.accessToken,
+                refresh_token: data.refreshToken,
+            });
+
+            setSession(data.accessToken, data.user, data.org);
+            toast.success(`Welcome to mini-AI HRMS, ${data.user.name}! 🎉`, { duration: 4000 });
             navigate('/dashboard', { replace: true });
         } catch (err: unknown) {
             setApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');

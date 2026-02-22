@@ -71,10 +71,10 @@ const ListQuerySchema = z.object({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Read orgId exclusively from the verified JWT payload on req.org. */
+/** Read orgId exclusively from the verified JWT payload on req.user. */
 function requireOrgId(req: AuthRequest): string {
-    // req.org is guaranteed by authMiddleware — non-null assertion is correct here.
-    return req.org!.id;
+    // req.user is guaranteed by authMiddleware — non-null assertion is correct here.
+    return req.user!.orgId;
 }
 
 // ─── POST /api/employees ──────────────────────────────────────────────────────
@@ -88,7 +88,10 @@ export async function createEmployeeHandler(
         const orgId = requireOrgId(req);
         const input = CreateEmployeeSchema.parse(req.body);
 
-        const employee = await createEmployee(orgId, input);
+        const employee = await createEmployee(orgId, {
+            ...input,
+            role: input.role as any,
+        });
 
         sendSuccess(res, toResponse(employee), 201);
     } catch (err) {

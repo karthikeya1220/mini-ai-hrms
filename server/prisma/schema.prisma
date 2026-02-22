@@ -52,7 +52,8 @@ model Employee {
   orgId         String   @map("org_id") @db.Uuid
   name          String   @db.VarChar(255)
   email         String   @db.VarChar(255)
-  role          String?  @db.VarChar(100)
+  passwordHash  String   @map("password_hash") @db.Text
+  role          String   @default("EMPLOYEE") @db.VarChar(100)
   department    String?  @db.VarChar(100)
   skills        String[] // maps to TEXT[] in PostgreSQL
   walletAddress String?  @map("wallet_address") @db.VarChar(42)

@@ -59,7 +59,7 @@ const ListQuerySchema = z.object({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function requireOrgId(req: AuthRequest): string {
-    return req.org!.id; // guaranteed by authMiddleware
+    return req.user!.orgId; // guaranteed by authMiddleware
 }
 
 // ─── POST /api/tasks ──────────────────────────────────────────────────────────
@@ -95,6 +95,37 @@ export async function listTasksHandler(
             orgId,
             status: query.status,
             assignedTo: query.assignedTo,
+            priority: query.priority,
+            limit: query.limit,
+            cursor: query.cursor,
+        });
+
+        sendSuccess(res, {
+            data: result.data.map(toResponse),
+            nextCursor: result.nextCursor,
+            total: result.total,
+        });
+    } catch (err) {
+        next(err);
+    }
+}
+
+// ─── GET /api/tasks/my ────────────────────────────────────────────────────────
+
+export async function listMyTasksHandler(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const orgId = requireOrgId(req);
+        const userId = req.user!.id;
+        const query = ListQuerySchema.parse(req.query);
+
+        const result = await listTasks({
+            orgId,
+            status: query.status,
+            assignedTo: userId, // Force assignedTo to current user ID
             priority: query.priority,
             limit: query.limit,
             cursor: query.cursor,

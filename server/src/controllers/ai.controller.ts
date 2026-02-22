@@ -36,7 +36,7 @@ const UuidParam = z.object({
 
 // Helper: extract orgId from JWT — always call this, never read from params
 function requireOrgId(req: AuthRequest): string {
-    return req.org!.id; // guaranteed non-null by authMiddleware
+    return req.user!.orgId; // guaranteed non-null by authMiddleware
 }
 
 // =============================================================================

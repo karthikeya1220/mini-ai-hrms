@@ -14,20 +14,28 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 // ─── Response types ───────────────────────────────────────────────────────────
 
 export interface OrgInfo {
-  id:    string;
-  name:  string;
+  id: string;
+  name: string;
+}
+
+export interface UserInfo {
+  id: string;
+  name: string;
   email: string;
+  role: 'ADMIN' | 'EMPLOYEE';
 }
 
 export interface AuthResponse {
   accessToken: string;
-  org:         OrgInfo;
+  refreshToken: string;
+  user: UserInfo;
+  org: OrgInfo;
 }
 
 export interface ApiError {
-  success:    false;
-  error:      string;   // machine-readable code
-  message:    string;   // human-readable
+  success: false;
+  error: string;   // machine-readable code
+  message: string;   // human-readable
   statusCode: number;
 }
 
@@ -35,10 +43,10 @@ export interface ApiError {
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    method:      'POST',
+    method: 'POST',
     credentials: 'include',    // sends/receives the httpOnly refresh cookie
-    headers:     { 'Content-Type': 'application/json' },
-    body:        JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
 
   const json = await res.json();
@@ -56,8 +64,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 // ─── Auth endpoints ───────────────────────────────────────────────────────────
 
 export interface RegisterInput {
-  name:     string;
-  email:    string;
+  name: string;
+  email: string;
   password: string;
 }
 
@@ -67,7 +75,7 @@ export async function apiRegister(input: RegisterInput): Promise<AuthResponse> {
 }
 
 export interface LoginInput {
-  email:    string;
+  email: string;
   password: string;
 }
 
@@ -79,10 +87,10 @@ export async function apiLogin(input: LoginInput): Promise<AuthResponse> {
 /** POST /api/auth/logout — revokes refresh token cookie server-side */
 export async function apiLogout(accessToken: string): Promise<void> {
   await fetch(`${API_BASE}/auth/logout`, {
-    method:      'POST',
+    method: 'POST',
     credentials: 'include',
     headers: {
-      'Content-Type':  'application/json',
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${accessToken}`,
     },
   });
@@ -92,4 +100,20 @@ export async function apiLogout(accessToken: string): Promise<void> {
 export async function apiRefresh(): Promise<string> {
   const data = await post<{ accessToken: string }>('/auth/refresh', {});
   return data.accessToken;
+}
+
+/** GET /api/me — returns current authenticated user details */
+export async function apiMe(accessToken: string): Promise<{ user: UserInfo; org: OrgInfo }> {
+  const res = await fetch(`${API_BASE}/me`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error((json as { message?: string }).message ?? 'Failed to fetch user details');
+
+  return (json as { success: true; data: { user: UserInfo; org: OrgInfo } }).data;
 }

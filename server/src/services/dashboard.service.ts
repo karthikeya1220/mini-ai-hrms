@@ -287,3 +287,15 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
         generatedAt: new Date(),
     };
 }
+// =============================================================================
+// getDashboardEmployees(orgId)
+// =============================================================================
+
+/**
+ * Returns just the employee-level breakdown array from the dashboard snapshot.
+ * Used by GET /api/dashboard/employees.
+ */
+export async function getDashboardEmployees(orgId: string): Promise<EmployeeCompletionStat[]> {
+    const stats = await getDashboardStats(orgId);
+    return stats.employeeStats;
+}

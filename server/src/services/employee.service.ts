@@ -20,7 +20,8 @@
 
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { EmployeeRow, EmployeeResponse, PaginatedResponse } from '../types';
+import { hashPassword } from '../utils/hash';
+import { EmployeeRow, EmployeeResponse, PaginatedResponse, UserRole } from '../types';
 
 // ─── select clause ────────────────────────────────────────────────────────────
 // Centralised here so every query returns identical fields.
@@ -39,6 +40,27 @@ const EMPLOYEE_SELECT = {
     createdAt: true,
 } as const;
 
+/** Read type from Prisma effectively */
+type PrismaEmployeeRow = {
+    id: string;
+    orgId: string;
+    name: string;
+    email: string;
+    role: string;
+    department: string | null;
+    skills: string[];
+    walletAddress: string | null;
+    isActive: boolean;
+    createdAt: Date;
+};
+
+function mapRow(row: PrismaEmployeeRow): EmployeeRow {
+    return {
+        ...row,
+        role: row.role as any,
+    };
+}
+
 /** Strip orgId before sending to client. Called in controller, not service. */
 export function toResponse(row: EmployeeRow): EmployeeResponse {
     const { orgId: _stripped, ...safe } = row;
@@ -51,7 +73,8 @@ export function toResponse(row: EmployeeRow): EmployeeResponse {
 export interface CreateEmployeeInput {
     name: string;
     email: string;
-    role?: string;
+    password?: string; // Optional: can be set by Admin
+    role?: UserRole;
     department?: string;
     skills?: string[];
     walletAddress?: string;
@@ -65,19 +88,23 @@ export async function createEmployee(
     orgId: string,
     input: CreateEmployeeInput,
 ): Promise<EmployeeRow> {
+    const passwordHash = await hashPassword(input.password || 'Temporary123!');
+
     try {
-        return await prisma.employee.create({
+        const employee = await (prisma.employee as any).create({
             data: {
                 orgId,                                 // ← from JWT, never from input
                 name: input.name,
                 email: input.email,
-                role: input.role ?? null,
+                passwordHash,
+                role: input.role || 'EMPLOYEE',
                 department: input.department ?? null,
                 skills: input.skills ?? [],
                 walletAddress: input.walletAddress ?? null,
             },
             select: EMPLOYEE_SELECT,
         });
+        return mapRow(employee);
     } catch (err: unknown) {
         // UNIQUE(org_id, email) violation
         if (isPrismaUniqueError(err)) {
@@ -134,7 +161,8 @@ export async function listEmployees(
 
     // If we got limit+1 rows, there is a next page
     const hasMore = rows.length > limit;
-    const data = hasMore ? rows.slice(0, limit) : rows;
+    const dataRaw = hasMore ? rows.slice(0, limit) : rows;
+    const data = dataRaw.map((r: any) => mapRow(r));
     const nextCursor = hasMore ? (data[data.length - 1]?.id ?? null) : null;
 
     return { data, nextCursor, total };
@@ -162,7 +190,7 @@ export async function getEmployeeById(
         throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
     }
 
-    return employee;
+    return mapRow(employee as any);
 }
 
 // ─── UPDATE ───────────────────────────────────────────────────────────────────
@@ -227,14 +255,14 @@ export async function updateEmployee(
         throw err;
     }
 
-    // Fetch the updated row for the response. This is a separate read done
     // AFTER the atomic write completes — not a TOCTOU risk because:
     //   1. We already confirmed the record exists and belongs to this org above.
     //   2. The read is for response shaping only; no security decision depends on it.
-    return prisma.employee.findUniqueOrThrow({
+    const employee = await prisma.employee.findUniqueOrThrow({
         where: { id: employeeId },
         select: EMPLOYEE_SELECT,
     });
+    return mapRow(employee as any);
 }
 
 // ─── SOFT DELETE ──────────────────────────────────────────────────────────────
@@ -267,10 +295,11 @@ export async function deactivateEmployee(
     }
 
     // Fetch the updated row for the response (read-after-write for shaping only).
-    return prisma.employee.findUniqueOrThrow({
+    const employee = await prisma.employee.findUniqueOrThrow({
         where: { id: employeeId },
         select: EMPLOYEE_SELECT,
     });
+    return mapRow(employee as any);
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 // hooks/useTasks.ts — board state + CRUD + optimistic status moves
 
 import { useState, useEffect, useCallback } from 'react';
-import { listTasks, createTask, updateTaskStatus } from '../api/tasks';
+import { listTasks, listMyTasks, createTask, updateTaskStatus } from '../api/tasks';
 import type { Task, CreateTaskInput, TaskStatus, ListTaskParams } from '../api/tasks';
 
 interface UseTasksResult {
@@ -14,7 +14,11 @@ interface UseTasksResult {
     moveTask: (id: string, newStatus: TaskStatus) => Promise<Task>;
 }
 
-export function useTasks(token: string | null, params: ListTaskParams = {}): UseTasksResult {
+export function useTasks(
+    token: string | null,
+    params: ListTaskParams = {},
+    isMy: boolean = false
+): UseTasksResult {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -27,13 +31,15 @@ export function useTasks(token: string | null, params: ListTaskParams = {}): Use
         let cancelled = false;
         setLoading(true);
         setError(null);
-        // Fetch all three statuses in one go (no status filter = all tasks)
-        listTasks(token, { limit: 100, ...params })
+
+        const fetcher = isMy ? listMyTasks : listTasks;
+
+        fetcher(token, { limit: 100, ...params })
             .then(r => { if (!cancelled) { setTasks(r.data); setTotal(r.total); setLoading(false); } })
             .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, tick, paramsKey]);
+    }, [token, tick, paramsKey, isMy]);
 
     const refetch = useCallback(() => setTick(t => t + 1), []);
 

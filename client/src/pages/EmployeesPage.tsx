@@ -149,7 +149,7 @@ function FilterPill({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EmployeesPage() {
-    const { accessToken } = useAuth();
+    const { user, org, accessToken, logout } = useAuth();
 
     // ── Filters ────────────────────────────────────────────────────────────────
     const [search, setSearch] = useState('');
@@ -214,25 +214,57 @@ export default function EmployeesPage() {
         <div className="min-h-dvh bg-slate-950 text-slate-100">
             {/* ── Top nav ────────────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-                    <nav className="flex items-center gap-1 text-sm">
-                        <a href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg hover:bg-slate-800 font-medium">
-                            Dashboard
-                        </a>
-                        <span className="text-slate-700">/</span>
-                        <span className="text-slate-200 font-semibold px-2">Employees</span>
-                    </nav>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-6">
+                        {/* Brand (Mini Dashboard Style) */}
+                        <div className="flex items-center gap-2">
+                             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm flex items-center justify-center">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-white">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                                    <path d="M8 12h8M12 8v8" />
+                                </svg>
+                             </div>
+                             <div className="hidden md:block">
+                                <p className="text-xs font-bold text-white leading-none">{org?.name ?? 'Workspace'}</p>
+                                <p className="text-[10px] text-slate-500 leading-none mt-0.5">{user?.email}</p>
+                             </div>
+                        </div>
 
-                    <button
-                        id="btn-add-employee"
-                        onClick={() => { setSelected(null); setModal('add'); }}
-                        className="btn-primary text-sm gap-2"
-                    >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        Add employee
-                    </button>
+                        <nav className="flex items-center gap-1 text-sm bg-slate-900/50 p-1 rounded-xl border border-slate-800/50">
+                            <a href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
+                                Dashboard
+                            </a>
+                            <span className="text-slate-200 font-semibold px-3 py-1.5 bg-slate-800 rounded-lg shadow-sm">Employees</span>
+                            <a href="/tasks" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
+                                Tasks
+                            </a>
+                        </nav>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            id="btn-add-employee"
+                            onClick={() => { setSelected(null); setModal('add'); }}
+                            className="btn-primary text-sm gap-2"
+                        >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Add employee
+                        </button>
+                        <button
+                            id="btn-employees-logout"
+                            onClick={logout}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400 hover:border-red-500/50 hover:text-red-400 transition-all ml-1"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
+                            <span className="hidden sm:inline">Sign out</span>
+                        </button>
+                    </div>
                 </div>
             </header>
 

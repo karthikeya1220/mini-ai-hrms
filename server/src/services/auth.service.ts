@@ -1,111 +1,11 @@
 // =============================================================================
-// Auth service — business logic for register, login, refresh, logout.
-//
-// This layer owns:
-//   - Org creation with hashed password            (register)
-//   - Credential verification + token issuance     (login)
-//   - Access token rotation via refresh token      (refresh)
-//   - Soft-invalidation of refresh token           (logout)
-//
-// Refresh token revocation (CRITICAL-2 fix — was SPEC Risk R6):
-//   Revoked tokens are stored in Redis as:
-//     key:   hrms:revoked:<SHA-256(token)>   (hash — raw JWT never stored)
-//     value: '1'
-//     TTL:   REVOKED_TTL_SECONDS (7 days — matches JWT_REFRESH_EXPIRES_IN)
-//
-//   Graceful degradation:
-//     If Redis is unavailable, invalidation is skipped with a warning.
-//     isRefreshTokenRevoked() returns false so the auth flow is never
-//     blocked by a Redis outage. The token will expire naturally via its
-//     JWT TTL — an acceptable trade-off vs. locking all users out.
+// Auth service — business logic for register, login.
+// Auth is now maintained at Supabase.
 // =============================================================================
 
-import crypto from 'crypto';
+import { supabase } from '../lib/supabase';
 import prisma from '../lib/prisma';
-import { hashPassword, verifyPassword } from '../utils/hash';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
-import { getRedis, cacheKey } from '../lib/redis';
-
-// ─── Revocation store — Redis-backed ─────────────────────────────────────────
-
-/** Namespace for revoked-token keys inside the shared hrms: Redis key space. */
-const REVOKED_NS = 'revoked';
-
-/**
- * TTL applied to every revocation key.
- * Must be >= the refresh JWT's max lifetime so a revoked token can never
- * outlive its Redis tombstone.
- * Reads JWT_REFRESH_EXPIRES_IN for consistency; defaults to 7 days.
- */
-const REVOKED_TTL_SECONDS: number = (() => {
-    const raw = process.env.JWT_REFRESH_EXPIRES_IN ?? '7d';
-    // Support plain seconds (number string) or shorthand like '7d' / '168h'.
-    const match = raw.match(/^(\d+)(d|h|m|s)?$/);
-    if (!match) return 7 * 24 * 60 * 60;
-    const n = parseInt(match[1], 10);
-    const unit = match[2] ?? 's';
-    const multipliers: Record<string, number> = { d: 86_400, h: 3_600, m: 60, s: 1 };
-    return n * (multipliers[unit] ?? 1);
-})();
-
-/**
- * Derive a stable, fixed-length Redis key from a raw refresh token.
- * SHA-256 is used so the raw JWT string is never written to Redis;
- * a Redis dump cannot be used to replay tokens.
- */
-function revokedKey(token: string): string {
-    const hash = crypto.createHash('sha256').update(token).digest('hex');
-    return cacheKey(REVOKED_NS, hash); // → hrms:revoked:<sha256hex>
-}
-
-/**
- * Record a refresh token as revoked in Redis.
- *
- * Security note: only structurally valid tokens are admitted
- * (caller in logoutOrg() runs verifyRefreshToken() first), so
- * an attacker cannot inflate Redis with arbitrary garbage.
- *
- * Graceful degradation: if Redis is down, logs a warning and returns.
- * The token's JWT expiry (7 d) acts as the backstop.
- */
-async function invalidateRefreshToken(token: string): Promise<void> {
-    const redis = getRedis();
-    if (!redis) {
-        console.warn(
-            '[auth] Redis unavailable — refresh token revocation skipped. ' +
-            'Token will expire via its JWT TTL.'
-        );
-        return;
-    }
-    try {
-        await redis.setex(revokedKey(token), REVOKED_TTL_SECONDS, '1');
-    } catch (err) {
-        // Redis SETEX failure — log and continue. Never block logout.
-        console.warn('[auth] Redis SETEX failed — revocation skipped:', (err as Error).message);
-    }
-}
-
-/**
- * Check if a refresh token has been explicitly revoked.
- *
- * Graceful degradation: if Redis is unavailable, returns false (permit).
- * This is the correct failure mode — a transient Redis outage should not
- * lock every user out of token refresh.
- */
-async function isRefreshTokenRevoked(token: string): Promise<boolean> {
-    const redis = getRedis();
-    if (!redis) return false;
-    try {
-        const val = await redis.get(revokedKey(token));
-        return val !== null;
-    } catch (err) {
-        console.warn('[auth] Redis GET failed — treating token as not revoked:', (err as Error).message);
-        return false;
-    }
-}
-
-// ─── Register ─────────────────────────────────────────────────────────────────
 
 export interface RegisterInput {
     name: string;
@@ -116,153 +16,117 @@ export interface RegisterInput {
 export interface AuthResult {
     accessToken: string;
     refreshToken: string;
-    org: { id: string; name: string; email: string };
+    user: { id: string; name: string; email: string; role: string };
+    org: { id: string; name: string };
 }
 
 /**
- * Create a new organization (tenant) account.
- *
- * Critical invariants:
- *   - orgId is GENERATED by the database — never accepted from caller.
- *   - password is hashed before storage — plain text never written to DB.
- *   - email uniqueness enforced by DB constraint (SPEC § 2.3); we catch
- *     Prisma P2002 and convert to a user-facing AppError.
+ * Create a new organization (tenant) account via Supabase.
  */
 export async function registerOrg(input: RegisterInput): Promise<AuthResult> {
     const { name, email, password } = input;
 
-    // Reject obviously weak passwords before touching the DB or running bcrypt
-    if (password.length < 8) {
-        throw new AppError(400, 'WEAK_PASSWORD', 'Password must be at least 8 characters');
+    // 1. Sign up with Supabase
+    const { data: sb, error: sbError } = await supabase.auth.signUp({
+        email,
+        password,
+    });
+
+    if (sbError) {
+        throw new AppError(400, 'AUTH_FAILED', sbError.message);
     }
 
-    const passwordHash = await hashPassword(password);
+    if (!sb.user || !sb.session) {
+        throw new AppError(400, 'CONFIRMATION_REQUIRED', 'Please check your email to confirm your account.');
+    }
 
-    let org: { id: string; name: string; email: string };
-
+    // 2. Create local records
     try {
-        org = await prisma.organization.create({
-            data: { name, email, passwordHash },
-            select: { id: true, name: true, email: true },
+        return await prisma.$transaction(async (tx) => {
+            const org = await tx.organization.create({
+                data: { name, email, passwordHash: 'SUPABASE' },
+                select: { id: true, name: true },
+            });
+
+            const admin = await (tx.employee as any).create({
+                data: {
+                    orgId: org.id,
+                    name: 'System Admin',
+                    email,
+                    passwordHash: 'SUPABASE',
+                    role: 'ADMIN',
+                },
+                select: { id: true, name: true, email: true, role: true },
+            });
+
+            return {
+                accessToken: sb.session!.access_token,
+                refreshToken: sb.session!.refresh_token,
+                user: { ...admin, role: admin.role as string },
+                org,
+            };
         });
-    } catch (err: unknown) {
-        // Prisma unique constraint violation — email already registered
-        if (
-            typeof err === 'object' &&
-            err !== null &&
-            'code' in err &&
-            (err as { code: string }).code === 'P2002'
-        ) {
-            throw new AppError(409, 'EMAIL_ALREADY_REGISTERED', 'Email is already registered');
+    } catch (err: any) {
+        if (err.code === 'P2002') {
+            throw new AppError(409, 'EMAIL_ALREADY_REGISTERED', 'Email is already registered in our system.');
         }
         throw err;
     }
-
-    // Issue token pair immediately after registration — no separate login step needed
-    const accessToken = signAccessToken(org.id, org.email);
-    const refreshToken = signRefreshToken(org.id);
-
-    return { accessToken, refreshToken, org };
-}
-
-// ─── Login ────────────────────────────────────────────────────────────────────
-
-export interface LoginInput {
-    email: string;
-    password: string;
 }
 
 /**
- * Authenticate an existing organization and issue a JWT pair.
- *
- * Security: if the org is not found OR the password is wrong, we return the
- * same error message to prevent email enumeration attacks.
+ * Authenticate via Supabase.
  */
-export async function loginOrg(input: LoginInput): Promise<AuthResult> {
+export async function loginOrg(input: { email: string; password: string }): Promise<AuthResult> {
     const { email, password } = input;
 
-    const org = await prisma.organization.findUnique({
-        where: { email },
-        select: { id: true, name: true, email: true, passwordHash: true },
+    // 1. Sign in with Supabase
+    const { data: sb, error: sbError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
     });
 
-    // Constant-time: run bcrypt even on not-found to prevent timing attacks
-    const dummyHash = '$2a$12$invalidhashpaddingtoensureconstanttimebehaviourXXXXXXXX';
-    const isValid = await verifyPassword(password, org?.passwordHash ?? dummyHash);
-
-    if (!org || !isValid) {
-        // Same message for both "org not found" and "wrong password" — no enumeration
-        throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    if (sbError) {
+        throw new AppError(401, 'INVALID_CREDENTIALS', sbError.message);
     }
 
-    const accessToken = signAccessToken(org.id, org.email);
-    const refreshToken = signRefreshToken(org.id);
+    // 2. Fetch local profile
+    const employee = await (prisma.employee as any).findFirst({
+        where: { email, isActive: true },
+        select: {
+            id: true,
+            orgId: true,
+            name: true,
+            email: true,
+            role: true,
+            organization: { select: { id: true, name: true } },
+        },
+    });
+
+    if (!employee) {
+        throw new AppError(403, 'USER_NOT_SYNCED', 'Account exists but is not linked to any organization.');
+    }
 
     return {
-        accessToken,
-        refreshToken,
-        org: { id: org.id, name: org.name, email: org.email },
+        accessToken: sb.session!.access_token,
+        refreshToken: sb.session!.refresh_token,
+        user: {
+            id: employee.id,
+            name: employee.name,
+            email: employee.email,
+            role: employee.role as string,
+        },
+        org: employee.organization,
     };
 }
 
-// ─── Refresh ──────────────────────────────────────────────────────────────────
-
-export interface RefreshResult {
-    accessToken: string;
+/**
+ * Structural compatibility
+ */
+export async function refreshAccessToken(_refreshToken: string): Promise<{ accessToken: string }> {
+    throw new AppError(501, 'NOT_IMPLEMENTED', 'Use Supabase SDK to refresh tokens.');
 }
 
-/**
- * Issue a new access token using a valid refresh token.
- *
- * Does NOT rotate the refresh token itself — rotation is a future improvement
- * that requires the refresh_tokens DB table (not in current SPEC schema).
- */
-export async function refreshAccessToken(refreshToken: string): Promise<RefreshResult> {
-    // Check against revocation list first (catches logout'd tokens)
-    if (await isRefreshTokenRevoked(refreshToken)) {
-        throw new AppError(401, 'TOKEN_REVOKED', 'Refresh token has been revoked. Please log in again.');
-    }
-
-    // Verify signature and expiry
-    const payload = verifyRefreshToken(refreshToken); // throws AppError if invalid
-
-    // Verify that the org referenced in the token still exists in the DB
-    // (handles the edge case where an org was deleted post-issuance — SPEC R7 partial mitigate)
-    const org = await prisma.organization.findUnique({
-        where: { id: payload.orgId },
-        select: { id: true, email: true },
-    });
-
-    if (!org) {
-        throw new AppError(401, 'ORG_NOT_FOUND', 'Organization no longer exists');
-    }
-
-    const accessToken = signAccessToken(org.id, org.email);
-    return { accessToken };
-}
-
-// ─── Logout ───────────────────────────────────────────────────────────────────
-
-/**
- * Soft-invalidate the refresh token.
- *
- * The access token (1h) continues to work until natural expiry — this is an
- * accepted trade-off with stateless JWTs. The refresh token is revoked
- * immediately in Redis, preventing any further access token renewals.
- *
- * Revocation is persisted across server restarts (fix for CRITICAL-2).
- * If Redis is unavailable, revocation is skipped gracefully — see file header.
- */
-export async function logoutOrg(refreshToken: string): Promise<void> {
-    // Validate the token structure before recording in Redis.
-    // This prevents an attacker from flooding Redis with arbitrary garbage
-    // by POSTing junk to /api/auth/logout.
-    try {
-        verifyRefreshToken(refreshToken);
-    } catch {
-        // If the token is already invalid/expired, logout still succeeds silently.
-        // Do not leak whether the token was valid.
-    }
-
-    await invalidateRefreshToken(refreshToken);
+export async function logoutOrg(_refreshToken: string): Promise<void> {
+    // Structural compatibility
 }

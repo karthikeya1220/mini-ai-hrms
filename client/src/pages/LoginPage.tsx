@@ -1,47 +1,43 @@
 // =============================================================================
 // pages/LoginPage.tsx
 //
-// POST /api/auth/login → stores accessToken in AuthContext (memory)
+// Authentication is maintained at Supabase.
 // Redirect: /dashboard after successful login
-// On success: toast + navigate
-// On error:   inline error message below the form
 // =============================================================================
 
 import { useState, useId } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { apiLogin } from '../api/auth';
-import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { FloatingInput, LogoMark, Spinner, EyeIcon } from '../components/ui';
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 function validate(email: string, password: string) {
   const errors: { email?: string; password?: string } = {};
-  if (!email.trim())                    errors.email    = 'Email is required';
+  if (!email.trim()) errors.email = 'Email is required';
   else if (!/^\S+@\S+\.\S+$/.test(email)) errors.email = 'Enter a valid email address';
-  if (!password)                        errors.password = 'Password is required';
+  if (!password) errors.password = 'Password is required';
   return errors;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-  const { setSession } = useAuth();
-  const navigate       = useNavigate();
-  const location       = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Where to send the user after login — respect ?from= param (set by ProtectedRoute)
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
 
   const uid = useId();
 
-  const [email,      setEmail]      = useState('');
-  const [password,   setPassword]   = useState('');
-  const [showPwd,    setShowPwd]    = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
-  const [apiError,   setApiError]   = useState('');
-  const [loading,    setLoading]    = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,10 +49,16 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const data = await apiLogin({ email, password });
-      setSession(data.accessToken, data.org);
-      toast.success(`Welcome back, ${data.org.name} 👋`, { duration: 3000 });
-      navigate(from, { replace: true });
+      const { data, error: sbError } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (sbError) {
+        throw sbError;
+      }
+
+      if (data.session) {
+        toast.success('Welcome back! 👋', { duration: 3000 });
+        navigate(from, { replace: true });
+      }
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
@@ -93,7 +95,7 @@ export default function LoginPage() {
                        bg-red-500/10 px-4 py-3 text-sm text-red-300 animate-fade-in"
           >
             <svg className="w-4 h-4 mt-0.5 shrink-0 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             {apiError}
           </div>
@@ -137,9 +139,9 @@ export default function LoginPage() {
               </button>
             </div>
             {fieldErrors.password && (
-              <p className="field-error" role="alert">
+              <p className="field-error mt-2 flex items-center gap-1" role="alert">
                 <svg className="w-3 h-3 shrink-0" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4.25a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 1.5 0v-3.5zM8 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                  <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4.25a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 1.5 0v-3.5zM8 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
                 </svg>
                 {fieldErrors.password}
               </p>
@@ -164,7 +166,7 @@ export default function LoginPage() {
 
         {/* Footer note */}
         <p className="mt-6 text-center text-xs text-slate-600">
-          Access token stored in memory only — never in localStorage.
+          Authentication is maintained at Supabase for enhanced security.
         </p>
       </div>
     </div>

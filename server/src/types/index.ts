@@ -5,16 +5,20 @@
 
 import { Request } from 'express';
 
-// ─── Authenticated Request ────────────────────────────────────────────────────
-// After authMiddleware runs, every request carries this on req.org.
-// The orgId is extracted from the JWT — never accepted from the request body.
-export interface AuthenticatedOrg {
-    id: string;    // UUID
+// ─── Authenticated User ────────────────────────────────────────────────────
+// After authMiddleware runs, every request carries this on req.user.
+// The orgId and userId are extracted from the JWT.
+export type UserRole = 'ADMIN' | 'EMPLOYEE';
+
+export interface AuthenticatedUser {
+    id: string;      // User ID (Employee ID)
+    orgId: string;   // Organization ID
     email: string;
+    role: UserRole;
 }
 
 export interface AuthRequest extends Request {
-    org?: AuthenticatedOrg;
+    user?: AuthenticatedUser;
 }
 
 // ─── Standard API Response ───────────────────────────────────────────────────
@@ -49,7 +53,7 @@ export interface EmployeeRow {
     orgId: string;   // NOT sent to client — internal use only
     name: string;
     email: string;
-    role: string | null;
+    role: UserRole;
     department: string | null;
     skills: string[];
     walletAddress: string | null;

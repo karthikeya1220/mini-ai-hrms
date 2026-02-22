@@ -8,7 +8,7 @@
 // =============================================================================
 
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, authorize } from '../middleware/auth';
 import {
     getDashboardHandler,
     getDashboardEmployeesHandler,
@@ -16,8 +16,9 @@ import {
 
 const router = Router();
 
-// Enforce JWT on every route in this file.
+// Enforce JWT and ADMIN role on every route in this file.
 router.use(authMiddleware);
+router.use(authorize(['ADMIN']));
 
 // ── GET /api/dashboard ────────────────────────────────────────────────────────
 // Org-scoped aggregate statistics + per-employee completion breakdown.

@@ -38,9 +38,28 @@ function ProtectedRoute() {
   return <Outlet />;
 }
 
+// ─── AdminRoute ─────────────────────────────────────────────────────────────
+// Restricts access to ADMIN role only.
+function AdminRoute() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (user?.role !== 'ADMIN') {
+    return <Navigate to="/tasks" replace />;
+  }
+
+  return <Outlet />;
+}
+
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from /login and /register.
-
 function GuestRoute() {
   const { accessToken, isLoading } = useAuth();
 
@@ -75,8 +94,13 @@ function AppRouter() {
 
       {/* Protected — redirect to login if not signed in */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/employees" element={<EmployeesPage />} />
+        {/* Admin-only routes */}
+        <Route element={<AdminRoute />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/employees" element={<EmployeesPage />} />
+        </Route>
+
+        {/* Everyone (Admin & Employee) routes */}
         <Route path="/tasks"     element={<TaskBoardPage />} />
       </Route>
 

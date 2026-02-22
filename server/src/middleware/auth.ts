@@ -17,58 +17,79 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import { sendError } from '../utils/response';
-import { verifyAccessToken } from '../utils/jwt';
-import { AppError } from './errorHandler';
+import { supabase } from '../lib/supabase';
+import prisma from '../lib/prisma';
 
-export function authMiddleware(
+export async function authMiddleware(
     req: AuthRequest,
     res: Response,
     next: NextFunction
-): void {
-    // ── 1. Extract Bearer token from Authorization header ─────────────────────
-    // Client stores the access token in-memory (SPEC § Hour 10–13).
-    // It is NOT in localStorage — it is sent manually on each request.
+): Promise<void> {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        sendError(
-            res,
-            401,
-            'UNAUTHORIZED',
-            'Missing or malformed Authorization header. Expected: Bearer <token>'
-        );
+        sendError(res, 401, 'UNAUTHORIZED', 'Missing or malformed Authorization header.');
         return;
     }
 
-    const token = authHeader.slice(7); // strip "Bearer " prefix
+    const token = authHeader.slice(7);
 
-    if (!token) {
-        sendError(res, 401, 'UNAUTHORIZED', 'Access token is empty');
-        return;
-    }
-
-    // ── 2. Verify token and extract payload ───────────────────────────────────
-    // verifyAccessToken throws AppError on invalid/expired tokens.
-    // We catch it here and translate to a response — we are in middleware,
-    // not inside next(), so the global errorHandler won't fire for us.
     try {
-        const payload = verifyAccessToken(token);
+        // ── 1. Verify with Supabase ───────────────────────────────────────────
+        const { data: { user: sbUser }, error: sbError } = await supabase.auth.getUser(token);
 
-        // ── 3. Attach org context to request ────────────────────────────────────
-        // Downstream controllers / services read req.org.id — NEVER req.body.orgId.
-        // This is the single source of truth for multi-tenancy scoping.
-        req.org = {
-            id: payload.orgId,
-            email: payload.email,
+        if (sbError || !sbUser) {
+            sendError(res, 401, 'UNAUTHORIZED', 'Invalid session or token expired.');
+            return;
+        }
+
+        // ── 2. Link to local Employee/Org ─────────────────────────────────────
+        // We use email as the bridge. Employee table has (orgId, email) unique.
+        // We find the employee regardless of org (since email is globally unique in Supabase).
+        const employee = await (prisma.employee as any).findFirst({
+            where: { email: sbUser.email, isActive: true },
+            select: { id: true, orgId: true, role: true, email: true }
+        });
+
+        if (!employee) {
+            sendError(res, 403, 'USER_NOT_SYNCED', 'Your account is recognized but not linked to any organization.');
+            return;
+        }
+
+        req.user = {
+            id: employee.id,
+            orgId: employee.orgId,
+            email: employee.email,
+            role: employee.role as 'ADMIN' | 'EMPLOYEE',
         };
 
         next();
     } catch (err) {
-        if (err instanceof AppError) {
-            sendError(res, err.statusCode, err.code, err.message);
-            return;
-        }
-        // Unexpected error — don't leak details
         sendError(res, 401, 'UNAUTHORIZED', 'Authentication failed');
     }
+}
+
+/**
+ * Authorization middleware — restricts access to specific roles.
+ * Must be registered AFTER authMiddleware.
+ */
+export function authorize(roles: ('ADMIN' | 'EMPLOYEE')[]) {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+        if (!req.user) {
+            sendError(res, 401, 'UNAUTHORIZED', 'Authentication required');
+            return;
+        }
+
+        if (!roles.includes(req.user.role)) {
+            sendError(
+                res,
+                403,
+                'FORBIDDEN',
+                `Insufficient permissions. Required: [${roles.join(', ')}]`
+            );
+            return;
+        }
+
+        next();
+    };
 }

@@ -87,6 +87,15 @@ export function listTasks(token: string, params: ListTaskParams = {}): Promise<P
     return authFetch<PaginatedTasks>('GET', `/tasks${qs.toString() ? '?' + qs : ''}`, token);
 }
 
+export function listMyTasks(token: string, params: ListTaskParams = {}): Promise<PaginatedTasks> {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.priority) qs.set('priority', params.priority);
+    if (params.limit) qs.set('limit', String(params.limit));
+    if (params.cursor) qs.set('cursor', params.cursor);
+    return authFetch<PaginatedTasks>('GET', `/tasks/my${qs.toString() ? '?' + qs : ''}`, token);
+}
+
 export function createTask(token: string, data: CreateTaskInput): Promise<Task> {
     return authFetch<Task>('POST', '/tasks', token, data);
 }

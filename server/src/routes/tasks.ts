@@ -13,12 +13,13 @@
 // =============================================================================
 
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, authorize } from '../middleware/auth';
 import {
     createTaskHandler,
     listTasksHandler,
     getTaskHandler,
     updateStatusHandler,
+    listMyTasksHandler,
 } from '../controllers/task.controller';
 
 const router = Router();
@@ -26,9 +27,13 @@ const router = Router();
 // Enforce JWT on every route in this file.
 router.use(authMiddleware);
 
-router.get('/', listTasksHandler);
-router.post('/', createTaskHandler);
-router.get('/:id', getTaskHandler);
-router.put('/:id/status', updateStatusHandler);
+// --- Employee & Admin ---
+router.get('/my', listMyTasksHandler); // Personal tasks
+router.get('/:id', getTaskHandler);    // Detail view (scoped by orgId + internal logic)
+router.put('/:id/status', updateStatusHandler); // Status transitions
+
+// --- Admin Only ---
+router.get('/', authorize(['ADMIN']), listTasksHandler);
+router.post('/', authorize(['ADMIN']), createTaskHandler);
 
 export default router;

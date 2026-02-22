@@ -51,7 +51,7 @@ export async function getDashboardHandler(
     next: NextFunction,
 ): Promise<void> {
     try {
-        const orgId = req.org!.id; // guaranteed non-null by authMiddleware
+        const orgId = req.user!.orgId; // guaranteed non-null by authMiddleware
 
         const stats = await getDashboardStats(orgId);
 
@@ -75,7 +75,7 @@ export async function getDashboardEmployeesHandler(
     next: NextFunction,
 ): Promise<void> {
     try {
-        const orgId = req.org!.id;
+        const orgId = req.user!.orgId;
 
         const employees = await getDashboardEmployees(orgId);
 

@@ -136,7 +136,7 @@ function MiniBar({ rate }: { rate: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-    const { org, accessToken, logout } = useAuth();
+    const { user, org, accessToken, logout } = useAuth();
     const { data, loading, error, refetch } = useDashboard(accessToken);
 
     const updatedAt = data?.generatedAt
@@ -148,15 +148,27 @@ export default function DashboardPage() {
             {/* ── Top nav ──────────────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    {/* Brand */}
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm shadow-brand-500/30">
-                            {icons.logo}
+                    <div className="flex items-center gap-6">
+                        {/* Brand */}
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm shadow-brand-500/30">
+                                {icons.logo}
+                            </div>
+                            <div className="hidden sm:block">
+                                <p className="text-sm font-bold text-white leading-none">{org?.name ?? 'Workspace'}</p>
+                                <p className="text-xs text-slate-500 leading-none mt-0.5">{user?.email}</p>
+                            </div>
                         </div>
-                        <div className="hidden sm:block">
-                            <p className="text-sm font-bold text-white leading-none">{org?.name ?? 'Workspace'}</p>
-                            <p className="text-xs text-slate-500 leading-none mt-0.5">{org?.email}</p>
-                        </div>
+
+                        <nav className="flex items-center gap-1 text-sm bg-slate-900/50 p-1 rounded-xl border border-slate-800/50">
+                            <span className="text-slate-200 font-semibold px-3 py-1.5 bg-slate-800 rounded-lg shadow-sm">Dashboard</span>
+                            <a href="/employees" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
+                                Employees
+                            </a>
+                            <a href="/tasks" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
+                                Tasks
+                            </a>
+                        </nav>
                     </div>
 
                     {/* Actions */}

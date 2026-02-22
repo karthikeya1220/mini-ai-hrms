@@ -81,9 +81,9 @@ export async function logBlockchainEntryHandler(
 ): Promise<void> {
     try {
         // ── 1. Tenant context from JWT — never from body ──────────────────────
-        const orgId = req.org?.id;
+        const orgId = req.user?.orgId;
         if (!orgId) {
-            // authMiddleware always sets req.org before this runs.
+            // authMiddleware always sets req.user before this runs.
             // This guard exists for future callers that bypass middleware in tests.
             throw new AppError(401, 'UNAUTHORIZED', 'Missing org context');
         }

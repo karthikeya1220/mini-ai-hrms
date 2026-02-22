@@ -14,21 +14,22 @@
 // =============================================================================
 
 import { createContext, useContext } from 'react';
-import type { OrgInfo } from '../api/auth';
+import type { OrgInfo, UserInfo } from '../api/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AuthState {
     accessToken: string | null;
-    org:         OrgInfo | null;
-    isLoading:   boolean;       // true while the initial silent refresh is running
+    user: UserInfo | null;
+    org: OrgInfo | null;
+    isLoading: boolean;       // true while the initial silent refresh is running
 }
 
 export interface AuthContextValue extends AuthState {
     /** Call after a successful login or register to store the session. */
-    setSession: (accessToken: string, org: OrgInfo) => void;
+    setSession: (accessToken: string, user: UserInfo, org: OrgInfo) => void;
     /** Logs out — clears state + revokes cookie server-side. */
-    logout:     () => Promise<void>;
+    logout: () => Promise<void>;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -41,24 +42,4 @@ export function useAuth(): AuthContextValue {
     const ctx = useContext(AuthContext);
     if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
     return ctx;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Decode the JWT payload (base64url) to extract org email for display
- * after a silent refresh (where the server only returns the new accessToken).
- * DISPLAY-ONLY — never used for authorization.
- */
-export function extractOrgFromToken(token: string): OrgInfo | null {
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return {
-            id:    payload.orgId ?? '',
-            name:  '',
-            email: payload.email ?? '',
-        };
-    } catch {
-        return null;
-    }
 }

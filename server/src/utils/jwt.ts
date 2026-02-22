@@ -18,16 +18,17 @@ import { AppError } from '../middleware/errorHandler';
 
 // ─── Payload shape ────────────────────────────────────────────────────────────
 // SPEC: JWT payload must contain { orgId, email }.
-// sub = orgId mirrors RFC 7519 — keeps the token interoperable.
+// sub = userId mirrors RFC 7519 — keeps the token interoperable.
 export interface JwtAccessPayload extends JwtPayload {
     orgId: string;
+    userId: string;  // can be Org ID (for system admin) or Employee ID
     email: string;
-    // sub is set equal to orgId — satisfies R8 from architecture analysis
+    role: string;    // 'ADMIN' | 'EMPLOYEE'
 }
 
 export interface JwtRefreshPayload extends JwtPayload {
+    userId: string;
     orgId: string;
-    // Refresh token payload is minimal — email not required for refresh
 }
 
 // ─── Environment guard ────────────────────────────────────────────────────────
@@ -49,14 +50,14 @@ function requireSecret(key: 'JWT_SECRET' | 'JWT_REFRESH_SECRET'): string {
  * Payload: { orgId, email, sub: orgId }
  * Expiry: JWT_EXPIRES_IN (default 1h — SPEC-mandated)
  */
-export function signAccessToken(orgId: string, email: string): string {
+export function signAccessToken(userId: string, orgId: string, email: string, role: string): string {
     const secret = requireSecret('JWT_SECRET');
     const expiresIn = (process.env.JWT_EXPIRES_IN ?? '1h') as SignOptions['expiresIn'];
 
-    const payload: Omit<JwtAccessPayload, keyof JwtPayload> = { orgId, email };
+    const payload: Omit<JwtAccessPayload, keyof JwtPayload> = { userId, orgId, email, role };
 
     return jwt.sign(payload, secret, {
-        subject: orgId,      // RFC 7519 sub claim — satisfies R8
+        subject: userId,      // RFC 7519 sub claim — satisfies R8
         expiresIn,
         issuer: 'mini-ai-hrms',
     });
@@ -76,7 +77,7 @@ export function verifyAccessToken(token: string): JwtAccessPayload {
         }) as JwtAccessPayload;
 
         // Structural guard — ensure the payload contains what we require
-        if (!payload.orgId || !payload.email) {
+        if (!payload.userId || !payload.orgId || !payload.email || !payload.role) {
             throw new AppError(401, 'INVALID_TOKEN', 'Token payload is malformed');
         }
 
@@ -102,12 +103,12 @@ export function verifyAccessToken(token: string): JwtAccessPayload {
  * Expiry: JWT_REFRESH_EXPIRES_IN (default 7d — SPEC-mandated)
  * Stored client-side in an httpOnly cookie — never in localStorage.
  */
-export function signRefreshToken(orgId: string): string {
+export function signRefreshToken(userId: string, orgId: string): string {
     const secret = requireSecret('JWT_REFRESH_SECRET');
     const expiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as SignOptions['expiresIn'];
 
-    return jwt.sign({ orgId } satisfies Omit<JwtRefreshPayload, keyof JwtPayload>, secret, {
-        subject: orgId,
+    return jwt.sign({ userId, orgId } satisfies Omit<JwtRefreshPayload, keyof JwtPayload>, secret, {
+        subject: userId,
         expiresIn,
         issuer: 'mini-ai-hrms',
     });
@@ -125,7 +126,7 @@ export function verifyRefreshToken(token: string): JwtRefreshPayload {
             issuer: 'mini-ai-hrms',
         }) as JwtRefreshPayload;
 
-        if (!payload.orgId) {
+        if (!payload.userId || !payload.orgId) {
             throw new AppError(401, 'INVALID_TOKEN', 'Refresh token payload is malformed');
         }
 

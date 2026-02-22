@@ -1,32 +1,34 @@
 // =============================================================================
-// Me controller — returns the authenticated org's identity from req.org.
+// Me controller — returns the authenticated user + org identity.
 //
-// This endpoint exists to:
-//   1. Give the frontend a way to verify a stored access token is still valid
-//      without re-logging in (e.g. on page load / tab focus).
-//   2. Return the canonical orgId that all subsequent requests must use.
-//
-// SPEC invariant: orgId is NEVER sourced from the request body.
-// Here it comes exclusively from req.org, which authMiddleware populates
-// after verifying the JWT signature.
-//
-// req.org is typed as AuthenticatedOrg | undefined.
-// The non-null assertion below is safe: this controller is only ever reached
-// after authMiddleware, which either populates req.org or returns 401.
+// authMiddleware populates req.user from the Supabase token + local DB lookup.
+// We then fetch the org name to return a complete profile.
 // =============================================================================
 
 import { Response } from 'express';
 import { AuthRequest } from '../types';
 import { sendSuccess } from '../utils/response';
+import prisma from '../lib/prisma';
 
-export function getMe(req: AuthRequest, res: Response): void {
-    // req.org is guaranteed non-null here — authMiddleware runs before this handler.
-    // If it were somehow undefined (misconfigured router), the type cast would throw
-    // at runtime, which is the correct failure mode (loud, not silent).
-    const org = req.org!;
+export async function getMe(req: AuthRequest, res: Response): Promise<void> {
+    const user = req.user!;
+
+    // Fetch employee name + org name in one query via relation
+    const employee = await (prisma.employee as any).findUnique({
+        where: { id: user.id },
+        select: {
+            name: true,
+            organization: { select: { id: true, name: true } },
+        },
+    });
 
     sendSuccess(res, {
-        orgId: org.id,
-        email: org.email,
+        user: {
+            id:    user.id,
+            name:  employee?.name ?? '',
+            email: user.email,
+            role:  user.role,
+        },
+        org: employee?.organization ?? { id: user.orgId, name: 'Workspace' },
     });
 }
