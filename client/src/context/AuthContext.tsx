@@ -28,7 +28,7 @@ export interface AuthContextValue {
     isEmployee: boolean;        // user?.role === 'EMPLOYEE'
 
     // Actions
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<UserInfo>;
     logout: () => Promise<void>;
 }
 

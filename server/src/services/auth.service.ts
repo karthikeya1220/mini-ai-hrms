@@ -288,6 +288,12 @@ export interface RegisterInput {
   email: string;
   /** Plain-text password — hashed with bcrypt (12 rounds) before storage. */
   password: string;
+  /**
+   * Role for the registering user.
+   * Defaults to 'ADMIN' (org-owner self-registration).
+   * Pass 'EMPLOYEE' when an org allows employees to self-register.
+   */
+  role?: Role;
 }
 
 export interface RegisterResult {
@@ -304,6 +310,7 @@ export interface RegisterResult {
     orgId: string;
     email: string;
     role: Role;
+    employeeId: string | null;
   };
 }
 
@@ -327,7 +334,7 @@ export interface RegisterResult {
  * @throws AppError 500 DB_ERROR      on unexpected Prisma failures.
  */
 export async function registerUser(input: RegisterInput): Promise<RegisterResult> {
-  const { orgName, email, password } = input;
+  const { orgName, email, password, role = 'ADMIN' } = input;
 
   // Hash before entering the transaction so bcrypt's CPU cost does not hold
   // a DB connection open longer than necessary.
@@ -346,7 +353,8 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
         select: { id: true, name: true },
       });
 
-      // 2. Create the first user as ADMIN.
+      // 2. Create the first user with the requested role.
+      //    Defaults to ADMIN (org-owner self-registration path).
       //    employeeId is intentionally omitted (null) — the User exists at the
       //    auth layer; an Employee profile is a separate business-logic concern.
       const user = await (tx as any).user.create({
@@ -354,7 +362,7 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
           orgId:        org.id,
           email,
           passwordHash,
-          role:         'ADMIN',
+          role,          // caller-supplied; defaults to 'ADMIN'
           // tokenVersion: 0 — Prisma default, no need to set explicitly
           // isActive:     true — Prisma default
           // employeeId:   null — Prisma default (optional relation)
@@ -388,10 +396,11 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
       accessToken,
       refreshToken,
       user: {
-        id:    user.id,
-        orgId: user.orgId,
-        email: user.email,
-        role:  user.role as Role,
+        id:         user.id,
+        orgId:      user.orgId,
+        email:      user.email,
+        role:       user.role as Role,
+        employeeId: user.employeeId,
       },
     };
   } catch (err: unknown) {
@@ -423,6 +432,7 @@ export interface LoginResult {
     orgId: string;
     email: string;
     role: Role;
+    employeeId: string | null;
   };
 }
 
@@ -507,10 +517,11 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
     accessToken,
     refreshToken,
     user: {
-      id:    user.id,
-      orgId: user.orgId,
-      email: user.email,
-      role:  user.role as Role,
+      id:         user.id,
+      orgId:      user.orgId,
+      email:      user.email,
+      role:       user.role as Role,
+      employeeId: user.employeeId,
     },
   };
 }

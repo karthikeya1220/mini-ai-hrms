@@ -28,6 +28,7 @@ export interface UserInfo {
     email: string;
     role: 'ADMIN' | 'EMPLOYEE';
     employeeId: string | null;
+    name?: string;   // present on /me response, absent on login/register response
 }
 
 export interface AuthResponse {
@@ -41,6 +42,8 @@ export interface RegisterInput {
     orgName: string;
     email: string;
     password: string;
+    /** Role for the registering user. Defaults to 'ADMIN' on the server if omitted. */
+    role?: 'ADMIN' | 'EMPLOYEE';
 }
 
 export async function apiRegister(input: RegisterInput): Promise<AuthResponse> {

@@ -61,11 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // ── login ─────────────────────────────────────────────────────────────────
-    const login = useCallback(async (email: string, password: string) => {
+    const login = useCallback(async (email: string, password: string): Promise<UserInfo> => {
         const { accessToken, user } = await apiLogin({ email, password });
         setToken(accessToken);                   // → Axios interceptor memory
         const { org } = await apiMe();           // fetch org via /me
         setState({ user, org, isLoading: false });
+        return user;                             // callers can inspect role for redirect
     }, []);
 
     // ── logout — revoke server-side + clear client state ─────────────────────

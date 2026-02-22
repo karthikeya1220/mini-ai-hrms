@@ -11,6 +11,14 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { FloatingInput, LogoMark, Spinner, EyeIcon } from '../components/ui';
 
+// ─── Role-aware default landing page ─────────────────────────────────────────
+// Admins land on /dashboard; employees land on /tasks.
+// The `from` state (set by ProtectedRoute when redirecting to /login) is still
+// respected so a deep-link like /employees that an admin bookmarked works fine.
+function defaultLanding(role: 'ADMIN' | 'EMPLOYEE' | undefined): string {
+  return role === 'EMPLOYEE' ? '/tasks' : '/dashboard';
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 function validate(email: string, password: string) {
@@ -28,8 +36,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Where to send the user after login — respect ?from= param (set by ProtectedRoute)
-  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
+  // Respect an explicit `from` path set by ProtectedRoute (e.g. user tried to open
+  // /employees directly while logged out).  When there's no explicit destination,
+  // resolve the landing page from the user's role after login resolves:
+  //   ADMIN    → /dashboard
+  //   EMPLOYEE → /tasks
+  const explicitFrom = (location.state as { from?: string } | null)?.from;
 
   const uid = useId();
 
@@ -50,9 +62,11 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
       toast.success('Welcome back! 👋', { duration: 3000 });
-      navigate(from, { replace: true });
+      // Role-aware redirect: explicit deep-link > role default
+      const destination = explicitFrom ?? defaultLanding(loggedInUser.role);
+      navigate(destination, { replace: true });
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {

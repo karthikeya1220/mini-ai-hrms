@@ -11,6 +11,7 @@ import { useDashboard } from '../hooks/useDashboard';
 import { StatCard } from '../components/dashboard/StatCard';
 import { CompletionChart } from '../components/dashboard/CompletionChart';
 import { ScoreBadge } from '../components/dashboard/ScoreBadge';
+import { AppNav } from '../components/layout/AppNav';
 
 // ─── SVG icon helpers ────────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ function MiniBar({ rate }: { rate: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-    const { user, org, logout } = useAuth();
+    useAuth();  // keep context subscription so ProtectedRoute re-renders on logout
     const { data, loading, error, refetch } = useDashboard();
 
     const updatedAt = data?.generatedAt
@@ -146,35 +147,12 @@ export default function DashboardPage() {
     return (
         <div className="min-h-dvh bg-slate-950 text-slate-100">
             {/* ── Top nav ──────────────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-6">
-                        {/* Brand */}
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm shadow-brand-500/30">
-                                {icons.logo}
-                            </div>
-                            <div className="hidden sm:block">
-                                <p className="text-sm font-bold text-white leading-none">{org?.name ?? 'Workspace'}</p>
-                                <p className="text-xs text-slate-500 leading-none mt-0.5">{user?.email}</p>
-                            </div>
-                        </div>
-
-                        <nav className="flex items-center gap-1 text-sm bg-slate-900/50 p-1 rounded-xl border border-slate-800/50">
-                            <span className="text-slate-200 font-semibold px-3 py-1.5 bg-slate-800 rounded-lg shadow-sm">Dashboard</span>
-                            <a href="/employees" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
-                                Employees
-                            </a>
-                            <a href="/tasks" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
-                                Tasks
-                            </a>
-                        </nav>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
+            <AppNav
+                currentPage="dashboard"
+                actions={
+                    <>
                         {updatedAt && (
-                            <span className="hidden sm:inline text-xs text-slate-600 mr-2">
+                            <span className="hidden sm:inline text-xs text-slate-600 mr-1">
                                 Updated {updatedAt}
                             </span>
                         )}
@@ -188,17 +166,9 @@ export default function DashboardPage() {
                             <span className={loading ? 'animate-spin' : ''}>{icons.refresh}</span>
                             <span className="hidden sm:inline">Refresh</span>
                         </button>
-                        <button
-                            id="btn-dashboard-logout"
-                            onClick={logout}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400 hover:border-red-500/50 hover:text-red-400 transition-all"
-                        >
-                            {icons.logout}
-                            <span className="hidden sm:inline">Sign out</span>
-                        </button>
-                    </div>
-                </div>
-            </header>
+                    </>
+                }
+            />
 
             {/* ── Main ─────────────────────────────────────────────────────────────── */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">

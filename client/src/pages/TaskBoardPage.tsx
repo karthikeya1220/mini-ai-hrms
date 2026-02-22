@@ -30,6 +30,7 @@ import { KanbanColumn } from '../components/tasks/KanbanColumn';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskModal } from '../components/tasks/TaskModal';
 import { ConnectWalletButton } from '../components/ui/ConnectWalletButton';
+import { AppNav } from '../components/layout/AppNav';
 
 // ─── Priority filter pill ─────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ function SkeletonCard() {
 const COLUMNS: TaskStatus[] = ['assigned', 'in_progress', 'completed'];
 
 export default function TaskBoardPage() {
-    const { user, org, isAdmin, logout } = useAuth();
+    const { isAdmin } = useAuth();
     const { logTaskCompletion, account } = useWeb3Context();
 
     // ── Task data ──────────────────────────────────────────────────────────────
@@ -203,41 +204,11 @@ export default function TaskBoardPage() {
 
     return (
         <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col">
-            {/* ── Sticky header ─────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-6">
-                        {/* Brand (Mini Dashboard Style) */}
-                        <div className="flex items-center gap-2">
-                             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm flex items-center justify-center">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-white">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                                    <path d="M8 12h8M12 8v8" />
-                                </svg>
-                             </div>
-                             <div className="hidden md:block">
-                                <p className="text-xs font-bold text-white leading-none">{org?.name ?? 'Workspace'}</p>
-                                <p className="text-[10px] text-slate-500 leading-none mt-0.5">{user?.email}</p>
-                             </div>
-                        </div>
-
-                        <nav className="flex items-center gap-1 text-sm bg-slate-900/50 p-1 rounded-xl border border-slate-800/50">
-                            {isAdmin && (
-                                <a href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
-                                    Dashboard
-                                </a>
-                            )}
-                            {isAdmin && (
-                                <a href="/employees" className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium">
-                                    Employees
-                                </a>
-                            )}
-                            <span className="text-slate-200 font-semibold px-3 py-1.5 bg-slate-800 rounded-lg shadow-sm">Tasks</span>
-                        </nav>
-                    </div>
-
-                    {/* Right controls */}
-                    <div className="flex items-center gap-2">
+            {/* ── Top nav ───────────────────────────────────────────────────────── */}
+            <AppNav
+                currentPage="tasks"
+                actions={
+                    <>
                         {/* Search */}
                         <div className="relative hidden sm:block">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -265,13 +236,10 @@ export default function TaskBoardPage() {
                                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                             </svg>
                         </button>
-                        
+
                         <ConnectWalletButton compact />
 
-                        {/* ── Connect Wallet button ───────────────────────────────
-                             Completely optional — non-connected state still allows
-                             full use of the task board. Only appears when Web3
-                             logging is possible (MetaMask installed = visible).   */}
+                        {/* New task — admin only */}
                         {isAdmin && (
                             <button
                                 id="btn-new-task"
@@ -284,30 +252,18 @@ export default function TaskBoardPage() {
                                 New task
                             </button>
                         )}
+                    </>
+                }
+            />
 
-                        <button
-                            id="btn-tasks-logout"
-                            onClick={logout}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400 hover:border-red-500/50 hover:text-red-400 transition-all ml-1"
-                        >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg>
-                            <span className="hidden sm:inline">Sign out</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Sub-header: title + priority filters */}
-                <div className="border-t border-slate-900 max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4">
+            {/* Sub-header: board title + on-chain indicator + priority filters */}
+            <div className="border-b border-slate-900 bg-slate-950/90 backdrop-blur-md sticky top-16 z-10">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <h1 className="text-sm font-bold text-white">Task Board</h1>
                         <span className="text-xs text-slate-600">
                             {filteredTasks.length} of {total} task{total !== 1 ? 's' : ''}
                         </span>
-                        {/* On-chain indicator — only shown when wallet connected */}
                         {account && (
                             <span className="flex items-center gap-1 text-[10px] text-violet-400/70 border border-violet-500/20 bg-violet-500/5 rounded-full px-2 py-0.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
@@ -326,7 +282,7 @@ export default function TaskBoardPage() {
                         ))}
                     </div>
                 </div>
-            </header>
+            </div>
 
             {/* ── Error ─────────────────────────────────────────────────────────── */}
             {error && (

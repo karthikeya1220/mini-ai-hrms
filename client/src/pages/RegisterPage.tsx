@@ -66,6 +66,7 @@ export default function RegisterPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
+    const [role, setRole] = useState<'ADMIN' | 'EMPLOYEE'>('ADMIN');
     const [showPwd, setShowPwd] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -88,12 +89,13 @@ export default function RegisterPage() {
 
         setLoading(true);
         try {
-            // 1. Create account + org
-            await apiRegister({ orgName: name, email, password });
+            // 1. Create account + org, passing the selected role
+            await apiRegister({ orgName: name, email, password, role });
             // 2. Re-use the login action to hydrate auth state (sets token + fetches /me)
-            await login(email, password);
+            const loggedInUser = await login(email, password);
             toast.success('Welcome to mini-AI HRMS! 🎉', { duration: 4000 });
-            navigate('/dashboard', { replace: true });
+            // Route to the right landing page based on the actual role in the JWT
+            navigate(loggedInUser.role === 'EMPLOYEE' ? '/tasks' : '/dashboard', { replace: true });
         } catch (err: unknown) {
             setApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
         } finally {
@@ -147,6 +149,45 @@ export default function RegisterPage() {
                         error={fieldErrors.name}
                         disabled={loading}
                     />
+
+                    {/* Role picker */}
+                    <div>
+                        <p className="field-label mb-2">I am registering as</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(['ADMIN', 'EMPLOYEE'] as const).map(r => (
+                                <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => setRole(r)}
+                                    disabled={loading}
+                                    className={`
+                                        flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium
+                                        transition-all duration-150
+                                        ${role === r
+                                            ? 'border-brand-500 bg-brand-500/10 text-brand-300'
+                                            : 'border-slate-700 bg-slate-900/50 text-slate-400 hover:border-slate-600 hover:text-slate-300'}
+                                    `}
+                                >
+                                    {r === 'ADMIN' ? (
+                                        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>
+                                    )}
+                                    {r === 'ADMIN' ? 'Admin' : 'Employee'}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-1.5">
+                            {role === 'ADMIN'
+                                ? 'Admins manage employees, tasks, and view org-wide analytics.'
+                                : 'Employees view and update their own tasks and productivity score.'}
+                        </p>
+                    </div>
 
                     <FloatingInput
                         id={`${uid}-email`}

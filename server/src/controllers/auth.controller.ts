@@ -58,6 +58,7 @@ const RegisterSchema = z.object({
     password: z.string()
         .min(8,  'Password must be at least 8 characters')
         .max(72, 'Password must be at most 72 characters'),  // bcrypt hard limit
+    role:     z.enum(['ADMIN', 'EMPLOYEE']).default('ADMIN'),
 });
 
 const LoginSchema = z.object({
