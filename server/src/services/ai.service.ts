@@ -133,10 +133,11 @@ export async function computeProductivityScore(
     // HISTORY POLICY: persistLog() always INSERTs — never overwrites old entries.
     // source tag travels with the breakdown JSON for audit provenance.
     const logRecord = await persistLog({
+        orgId,
         employeeId,
-        score:     result.score,
+        score: result.score,
         breakdown: result.breakdown,
-        source:    'task_completed',
+        source: 'task_completed',
     });
 
     console.info(
@@ -179,7 +180,7 @@ export async function getScore(
     });
 
     const result = computeScoreFromTasks(assigned);
-    const trend = await computeTrend(employeeId);
+    const trend = await computeTrend(orgId, employeeId);
 
     return {
         employeeId,
@@ -207,8 +208,12 @@ export async function getScore(
  *   - 'declining'         → now < before (by >= 1 point)
  *   - 'stable'            → delta < 1 point either direction
  *   - 'insufficient_data' → fewer than 2 log rows spanning both windows
+ *
+ * @param orgId      Tenant scope — propagated to getScoreHistory().
+ * @param employeeId Employee whose trend to compute.
  */
 async function computeTrend(
+    orgId: string,
     employeeId: string,
 ): Promise<ProductivityScoreResult['trend']> {
     const now = new Date();
@@ -217,20 +222,20 @@ async function computeTrend(
 
     // Fetch last 60 days of non-null score rows via the persistence layer.
     // getScoreHistory returns PerformanceLogScoreRow[] — score already decoded.
-    const logs = await getScoreHistory(employeeId, d60);
+    const logs = await getScoreHistory(orgId, employeeId, d60);
 
-    const recent   = logs.filter(l => l.computedAt >= d30);
-    const previous = logs.filter(l => l.computedAt <  d30);
+    const recent = logs.filter(l => l.computedAt >= d30);
+    const previous = logs.filter(l => l.computedAt < d30);
 
     if (recent.length === 0 || previous.length === 0) {
         return 'insufficient_data';
     }
 
-    const avgRecent   = recent.reduce((s, l)   => s + l.score, 0) / recent.length;
+    const avgRecent = recent.reduce((s, l) => s + l.score, 0) / recent.length;
     const avgPrevious = previous.reduce((s, l) => s + l.score, 0) / previous.length;
     const delta = avgRecent - avgPrevious;
 
-    if (delta >= 1)  return 'improving';
+    if (delta >= 1) return 'improving';
     if (delta <= -1) return 'declining';
     return 'stable';
 }
@@ -305,7 +310,7 @@ export async function recommendEmployees(
     // Delegates to getLatestScoreMap() in lib/performanceLog — batched single
     // query, decoded to Map<employeeId, number>. Absent employees default to 50.
     const employeeIds = employees.map(e => e.id);
-    const scoreMap = await getLatestScoreMap(employeeIds);
+    const scoreMap = await getLatestScoreMap(orgId, employeeIds);
 
     // ── Fetch active task counts per employee ──────────────────────────────────
     // "active" = not completed (assigned or in_progress)

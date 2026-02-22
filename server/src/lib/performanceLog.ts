@@ -37,6 +37,7 @@ import type { ScoringBreakdown } from '../services/ai.service';
 
 /** What callers pass in to write a new log entry. */
 export interface PerformanceLogInput {
+    orgId: string;               // tenant scope — required for defence-in-depth isolation
     employeeId: string;
     score: number | null;         // null = no tasks assigned / no completed tasks
     breakdown: ScoringBreakdown | null;
@@ -51,6 +52,7 @@ export interface PerformanceLogInput {
 /** What callers receive after a successful write. */
 export interface PerformanceLogRecord {
     id: string;
+    orgId: string;
     employeeId: string;
     score: number | null;         // decoded from Prisma Decimal
     breakdown: ScoringBreakdown | null;
@@ -124,6 +126,7 @@ function extractSource(raw: Prisma.JsonValue | null): string | null {
 /** Map a raw Prisma PerformanceLog row to the clean PerformanceLogRecord type. */
 function toRecord(row: {
     id: string;
+    orgId: string;
     employeeId: string;
     score: { toNumber(): number } | null; // Prisma Decimal
     breakdown: Prisma.JsonValue | null;
@@ -131,6 +134,7 @@ function toRecord(row: {
 }): PerformanceLogRecord {
     return {
         id: row.id,
+        orgId: row.orgId,
         employeeId: row.employeeId,
         score: row.score !== null ? row.score.toNumber() : null,
         breakdown: deserialiseBreakdown(row.breakdown),
@@ -153,10 +157,11 @@ function toRecord(row: {
  * @returns The newly created record, decoded to PerformanceLogRecord.
  */
 export async function persistLog(input: PerformanceLogInput): Promise<PerformanceLogRecord> {
-    const { employeeId, score, breakdown, source } = input;
+    const { orgId, employeeId, score, breakdown, source } = input;
 
     const row = await prisma.performanceLog.create({
         data: {
+            orgId,
             employeeId,
             // Prisma Decimal column: pass null when score is null
             score: score !== null ? new Prisma.Decimal(score) : null,
@@ -168,6 +173,7 @@ export async function persistLog(input: PerformanceLogInput): Promise<Performanc
         },
         select: {
             id: true,
+            orgId: true,
             employeeId: true,
             score: true,
             breakdown: true,
@@ -187,13 +193,20 @@ export async function persistLog(input: PerformanceLogInput): Promise<Performanc
  * Returns null if no log exists (employee has never been scored).
  *
  * Used by: recommendEmployees() to prime the perfScore factor.
+ *
+ * @param orgId      Tenant scope — required; prevents cross-org reads.
+ * @param employeeId The employee whose latest log to fetch.
  */
-export async function getLatestLog(employeeId: string): Promise<PerformanceLogRecord | null> {
+export async function getLatestLog(
+    orgId: string,
+    employeeId: string,
+): Promise<PerformanceLogRecord | null> {
     const row = await prisma.performanceLog.findFirst({
-        where: { employeeId },
+        where: { orgId, employeeId },
         orderBy: { computedAt: 'desc' },
         select: {
             id: true,
+            orgId: true,
             employeeId: true,
             score: true,
             breakdown: true,
@@ -208,13 +221,21 @@ export async function getLatestLog(employeeId: string): Promise<PerformanceLogRe
  * Returns lightweight rows — only score + computedAt for trend arithmetic.
  *
  * Used by: computeTrend() to compare last-30d vs prev-30d windows.
+ *
+ * @param orgId      Tenant scope — defence-in-depth; the employee ownership
+ *                   check in the caller already guarantees the employee belongs
+ *                   to this org, but adding it here protects future callers.
+ * @param employeeId Employee whose history to fetch.
+ * @param since      Lower bound (inclusive) on computed_at.
  */
 export async function getScoreHistory(
+    orgId: string,
     employeeId: string,
     since: Date,
 ): Promise<PerformanceLogScoreRow[]> {
     const rows = await prisma.performanceLog.findMany({
         where: {
+            orgId,
             employeeId,
             computedAt: { gte: since },
             score: { not: null },
@@ -232,18 +253,24 @@ export async function getScoreHistory(
  * Fetch the full log history for one employee (all entries, newest first).
  * Used by GET /api/ai/history/:employeeId (future endpoint) or audit views.
  *
- * @param limit  Default 50. Pass a larger value for export use cases.
+ * @param orgId      Tenant scope — must be provided; this function is the
+ *                   primary cross-cut risk surface (CRITICAL-1) so orgId is
+ *                   mandatory even for future callers.
+ * @param employeeId The employee whose history to return.
+ * @param limit      Default 50. Pass a larger value for export use cases.
  */
 export async function getLogHistory(
+    orgId: string,
     employeeId: string,
     limit = 50,
 ): Promise<PerformanceLogRecord[]> {
     const rows = await prisma.performanceLog.findMany({
-        where: { employeeId },
+        where: { orgId, employeeId },
         orderBy: { computedAt: 'desc' },
         take: limit,
         select: {
             id: true,
+            orgId: true,
             employeeId: true,
             score: true,
             breakdown: true,
@@ -259,14 +286,21 @@ export async function getLogHistory(
  * to avoid N+1 queries when ranking a pool of employees.
  *
  * Employees with no log entries are absent from the Map; callers use ?? 50.
+ *
+ * @param orgId       Tenant scope — all employeeIds MUST belong to this org
+ *                    (enforced upstream). Added here for defence-in-depth so
+ *                    any future direct caller is also protected.
+ * @param employeeIds Pool of employee IDs to look up (already org-scoped).
  */
 export async function getLatestScoreMap(
+    orgId: string,
     employeeIds: string[],
 ): Promise<Map<string, number>> {
     if (employeeIds.length === 0) return new Map();
 
     const rows = await prisma.performanceLog.findMany({
         where: {
+            orgId,
             employeeId: { in: employeeIds },
             score: { not: null },
         },

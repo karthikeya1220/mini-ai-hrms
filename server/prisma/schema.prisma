@@ -31,9 +31,10 @@ model Organization {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
-  employees      Employee[]
-  tasks          Task[]
-  blockchainLogs BlockchainLog[]
+  employees        Employee[]
+  tasks            Task[]
+  blockchainLogs   BlockchainLog[]
+  performanceLogs  PerformanceLog[]
 
   @@map("organizations")
 }
@@ -119,19 +120,31 @@ model Task {
 // SPEC: performance_logs table
 //   - score:     NUMERIC(5,2)  — e.g. 84.50
 //   - breakdown: JSONB         — { completionRate, onTimeRate, avgComplexity, … }
+// Non-SPEC addition (CRITICAL-1 fix from architecture audit):
+//   - org_id: added to enable defence-in-depth tenant scoping on every query.
+//     Backfill SQL in migration 0002_add_org_id_to_performance_logs.
 // ─────────────────────────────────────────────────────────────────────────────
 model PerformanceLog {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
   employeeId String   @map("employee_id") @db.Uuid
   score      Decimal? @db.Decimal(5, 2)
   breakdown  Json?    // maps to JSONB in PostgreSQL
   computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz()
+
+  // FK: org_id → organizations(id) ON DELETE CASCADE
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   // FK: employee_id → employees(id) ON DELETE CASCADE
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   // SPEC: CREATE INDEX idx_perf_employee ON performance_logs(employee_id)
   @@index([employeeId], name: "idx_perf_employee")
+  // Tenant-only lookups (invalidation, audit scans)
+  @@index([orgId], name: "idx_perf_org")
+  // Primary query pattern: WHERE org_id = ? AND employee_id = ? ORDER BY computed_at DESC
+  // Covers date-ranged score history and latest-score lookups without a heap scan.
+  @@index([orgId, employeeId, computedAt(sort: Desc)], name: "idx_perf_org_employee_date")
   @@map("performance_logs")
 }
 

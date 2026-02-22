@@ -10,8 +10,11 @@
 //   - Soft delete: set isActive = false, never hard-delete (SPEC § Day 1 Hour 4–7)
 //   - Unique constraint (orgId, email): P2002 caught and converted to AppError
 //   - Cursor-based pagination: not offset-based (SPEC § Day 1 Hour 4–7)
-//   - SPEC Risk R1: cross-tenant validation — employee fetched with orgId guard
-//     before any mutation, so an attacker cannot update/delete another org's employee
+//   - SPEC Risk R1: cross-tenant isolation — every mutation uses a compound
+//     where: { id, orgId } via updateMany so ownership is checked and the
+//     write are performed atomically in a single DB round-trip.
+//     (MEDIUM-4 fix: eliminates the TOCTOU window that existed between the
+//      prior getEmployeeById() call and the subsequent update() call.)
 //   - SPEC Risk R4: all list queries filter isActive = true by default
 // =============================================================================
 
@@ -175,7 +178,18 @@ export interface UpdateEmployeeInput {
 
 /**
  * Update employee fields.
- * Verifies ownership (orgId + employeeId) before any mutation — SPEC Risk R1.
+ *
+ * TOCTOU fix (MEDIUM-4 from arch audit):
+ *   Old approach: getEmployeeById() read + employee.update() write = two round-trips.
+ *   New approach: updateMany({ where: { id, orgId }, data }) in a single round-trip.
+ *   The compound where clause is checked and applied atomically by the database,
+ *   eliminating the race window between ownership verification and the write.
+ *
+ * Prisma does not expose update() with a non-unique compound where, so we use
+ * updateMany() which accepts arbitrary where predicates and returns { count }.
+ * count === 0 means either the employee does not exist or belongs to a different
+ * org — in both cases we return 404 (no info leakage about cross-org IDs).
+ *
  * orgId is excluded from the update data — it can never be re-assigned.
  */
 export async function updateEmployee(
@@ -183,12 +197,9 @@ export async function updateEmployee(
     employeeId: string,
     input: UpdateEmployeeInput,
 ): Promise<EmployeeRow> {
-    // Ownership check first — throws 404 if not found in this org
-    await getEmployeeById(orgId, employeeId);
-
     try {
-        return await prisma.employee.update({
-            where: { id: employeeId },   // safe: ownership already verified above
+        const result = await prisma.employee.updateMany({
+            where: { id: employeeId, orgId },   // ownership + mutation in one round-trip
             data: {
                 ...(input.name !== undefined && { name: input.name }),
                 ...(input.email !== undefined && { email: input.email }),
@@ -197,9 +208,15 @@ export async function updateEmployee(
                 ...(input.skills !== undefined && { skills: input.skills }),
                 ...(input.walletAddress !== undefined && { walletAddress: input.walletAddress }),
             },
-            select: EMPLOYEE_SELECT,
         });
+
+        if (result.count === 0) {
+            // Either the employee does not exist, or it belongs to a different org.
+            // Return 404 in both cases — no information leaked about cross-org IDs.
+            throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
+        }
     } catch (err: unknown) {
+        if (err instanceof AppError) throw err;
         if (isPrismaUniqueError(err)) {
             throw new AppError(
                 409,
@@ -209,6 +226,15 @@ export async function updateEmployee(
         }
         throw err;
     }
+
+    // Fetch the updated row for the response. This is a separate read done
+    // AFTER the atomic write completes — not a TOCTOU risk because:
+    //   1. We already confirmed the record exists and belongs to this org above.
+    //   2. The read is for response shaping only; no security decision depends on it.
+    return prisma.employee.findUniqueOrThrow({
+        where: { id: employeeId },
+        select: EMPLOYEE_SELECT,
+    });
 }
 
 // ─── SOFT DELETE ──────────────────────────────────────────────────────────────
@@ -223,17 +249,26 @@ export async function updateEmployee(
  *
  * SPEC Risk R4 mitigation: all list queries filter isActive = true by default,
  * so deactivated employees are excluded from recommendations and score pools.
+ *
+ * TOCTOU fix (MEDIUM-4 from arch audit):
+ *   Single atomic updateMany — same pattern as updateEmployee() above.
  */
 export async function deactivateEmployee(
     orgId: string,
     employeeId: string,
 ): Promise<EmployeeRow> {
-    // Ownership check before mutation — SPEC Risk R1
-    await getEmployeeById(orgId, employeeId);
-
-    return prisma.employee.update({
-        where: { id: employeeId },
+    const result = await prisma.employee.updateMany({
+        where: { id: employeeId, orgId },   // ownership + mutation in one round-trip
         data: { isActive: false },
+    });
+
+    if (result.count === 0) {
+        throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
+    }
+
+    // Fetch the updated row for the response (read-after-write for shaping only).
+    return prisma.employee.findUniqueOrThrow({
+        where: { id: employeeId },
         select: EMPLOYEE_SELECT,
     });
 }
