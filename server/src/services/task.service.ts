@@ -14,9 +14,10 @@
 //   - assignedTo employee must belong to the same org (validated before create)
 //
 // Background job contract:
-//   updateTaskStatus() fires the productivity scoring job via dispatchJob()
-//   and returns a typed StatusUpdateResult that tells the controller whether
-//   a job was queued — without the controller knowing how the job was dispatched.
+//   updateTaskStatus() fires the productivity scoring job via enqueueScoringJob()
+//   (BullMQ queue with retry) and returns a typed StatusUpdateResult that tells
+//   the controller whether a job was queued — without the controller knowing how
+//   or where the job is scheduled.
 // =============================================================================
 
 import prisma from '../lib/prisma';
@@ -29,8 +30,8 @@ import {
     PaginatedResponse,
     VALID_TRANSITIONS,
 } from '../types';
-import { dispatchJob } from '../lib/jobQueue';
-import { computeProductivityScore } from './ai.service';
+import { enqueueScoringJob } from '../lib/scoringQueue';
+import { invalidateDashboardCache } from './dashboard.service';
 
 // ─── Select clause ────────────────────────────────────────────────────────────
 const TASK_SELECT = {
@@ -242,28 +243,35 @@ export async function updateTaskStatus(
         select: TASK_SELECT,
     }) as unknown as TaskRow;
 
-    // ── 5. Dispatch background scoring job ────────────────────────────────────
+    // ── 5. Invalidate dashboard cache ─────────────────────────────────────────
+    // Any status change (assigned → in_progress, in_progress → completed) alters
+    // the org-level counters surfaced on the dashboard.
+    // invalidateDashboardCache() is internally fire-and-forget: Redis errors are
+    // swallowed there — they cannot affect this response.
+    void invalidateDashboardCache(orgId);
+
+    // ── 6. Enqueue background scoring job (BullMQ) ────────────────────────────
     // Conditions:
     //   a) New status is 'completed'
     //   b) Task has an assigned employee (unassigned tasks cannot be scored)
     //
-    // dispatchJob() queues fn() with setImmediate() and returns synchronously.
-    // The HTTP response is sent BEFORE the job runs — zero latency added here.
-    // Errors inside the job are caught and logged by dispatchJob — they CANNOT
-    // propagate back to this function or to the HTTP response.
+    // enqueueScoringJob() is fully synchronous at the call site — it fires
+    // Queue.add() as a void Promise and returns immediately without awaiting.
+    // The HTTP response is sent before Redis ACKs the job.
+    //
+    // Retry policy (configured in lib/scoringQueue.ts):
+    //   Up to SCORING_JOB_ATTEMPTS (default: 3) attempts with exponential
+    //   backoff starting at SCORING_JOB_BACKOFF_MS (default: 5 s).
+    //   Failures are logged with job ID, attempt count, and full stack trace.
+    //   Jobs survive server restarts (persisted in Redis, not in-process).
     let scoringDispatched = false;
 
     if (input.status === 'completed' && updated.assignedTo) {
-        const employeeId = updated.assignedTo; // captured before closure
-
-        dispatchJob(`computeProductivityScore:task=${taskId}`, () =>
-            computeProductivityScore({
-                orgId,
-                taskId,
-                employeeId,
-            }),
-        );
-
+        enqueueScoringJob({
+            orgId,
+            taskId,
+            employeeId: updated.assignedTo,
+        });
         scoringDispatched = true;
     }
 

@@ -1,2 +1,7 @@
 /SPEC.md
 /docs
+/contracts/node_modules
+/contracts/artifacts
+/contracts/cache
+/contracts/typechain-types
+/contracts/.env

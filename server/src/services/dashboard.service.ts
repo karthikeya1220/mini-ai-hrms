@@ -13,9 +13,18 @@
 //   3. orgId scoping is applied on EVERY where clause — never omitted.
 //   4. Unassigned tasks (assignedTo = null) are included in tasksAssigned
 //      because the SPEC does not constrain this count to assigned employees.
+//
+// Redis caching (§ Caching Layer):
+//   - TTL: 60 seconds, per-org key (hrms:dashboard:<orgId>)
+//   - getDashboardStats() → cache-aside: read Redis → fallback to DB → write Redis
+//   - invalidateDashboardCache(orgId) → DEL the org's key; called by task.service
+//     on every status update so the Kanban board never shows stale totals
+//   - Redis is OPTIONAL: if REDIS_URL is not set, every code path falls back
+//     to a live DB query with zero code changes at the call site
 // =============================================================================
 
 import prisma from '../lib/prisma';
+import { getRedis, cacheKey, DASHBOARD_NS } from '../lib/redis';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +54,27 @@ export interface DashboardStats {
 
     // Snapshot timestamp — client can display "data as of …"
     generatedAt: Date;
+
+    // Cache metadata — tells the client whether this response came from cache
+    _meta: {
+        source: 'cache' | 'live';
+        cachedAt?: string;   // ISO — present when source === 'cache'
+    };
+}
+
+// ─── Cache constants ──────────────────────────────────────────────────────────
+
+/**
+ * How long dashboard results live in Redis (seconds).
+ * 60 s is long enough to absorb Kanban polling bursts; short enough that
+ * a missed invalidation heals automatically.
+ */
+const DASHBOARD_TTL_SECONDS = 60;
+
+// ─── Internal: org cache key ──────────────────────────────────────────────────
+
+function dashboardCacheKey(orgId: string): string {
+    return cacheKey(DASHBOARD_NS, orgId);
 }
 
 // =============================================================================
@@ -52,13 +82,94 @@ export interface DashboardStats {
 // =============================================================================
 
 /**
- * Fetch all dashboard statistics for a single org in one batched DB trip.
+ * Fetch all dashboard statistics for a single org.
+ *
+ * Cache-aside strategy:
+ *   1. Try Redis GET — hit → deserialise + return (source: 'cache')
+ *   2. On miss → query DB, serialise to Redis with EX 60
+ *   3. If Redis is unavailable → always query DB (source: 'live')
  *
  * Org scoping: orgId is applied to every Prisma where clause.
  * A non-existent orgId simply returns zeroes — no 404 thrown here because
  * the JWT guarantees the org exists at login time.
  */
 export async function getDashboardStats(orgId: string): Promise<DashboardStats> {
+    const redis = getRedis();
+    const key   = dashboardCacheKey(orgId);
+
+    // ── 1. Cache read ──────────────────────────────────────────────────────────
+    if (redis) {
+        try {
+            const cached = await redis.get(key);
+            if (cached) {
+                const data = JSON.parse(cached) as DashboardStats;
+                // Rehydrate generatedAt as a Date (JSON.parse gives a string)
+                data.generatedAt = new Date(data.generatedAt);
+                data._meta = { source: 'cache', cachedAt: data.generatedAt.toISOString() };
+                return data;
+            }
+        } catch (err) {
+            // Redis GET error (e.g. serialisation issue, timeout) — not fatal.
+            console.warn('[dashboard] Redis GET failed — falling back to DB:', (err as Error).message);
+        }
+    }
+
+    // ── 2. DB query ────────────────────────────────────────────────────────────
+    const stats = await queryDashboardFromDB(orgId);
+
+    // ── 3. Cache write ─────────────────────────────────────────────────────────
+    if (redis) {
+        try {
+            // EX sets the TTL in seconds; NX is intentionally NOT used so we
+            // always refresh the cache on a DB hit (no thundering-herd here at
+            // org user count scale).
+            await redis.set(key, JSON.stringify(stats), 'EX', DASHBOARD_TTL_SECONDS);
+        } catch (err) {
+            // Redis SET failure — silently swallowed; the caller gets live data.
+            console.warn('[dashboard] Redis SET failed:', (err as Error).message);
+        }
+    }
+
+    return stats;
+}
+
+// =============================================================================
+// invalidateDashboardCache(orgId)
+// =============================================================================
+
+/**
+ * Delete the cached dashboard snapshot for an org.
+ *
+ * Called by task.service.updateTaskStatus() after every status transition so
+ * the next GET /api/dashboard reflects the new state within at most one poll
+ * cycle (rather than up to 60 s later).
+ *
+ * Silently no-ops when:
+ *   - Redis is disabled (REDIS_URL not set)
+ *   - The key does not exist (DEL on missing key is safe in Redis)
+ *   - Redis throws (never blocks or crashes the task update flow)
+ */
+export async function invalidateDashboardCache(orgId: string): Promise<void> {
+    const redis = getRedis();
+    if (!redis) return;
+
+    const key = dashboardCacheKey(orgId);
+    try {
+        const deleted = await redis.del(key);
+        if (deleted) {
+            console.log(`[dashboard] Cache invalidated for org ${orgId}`);
+        }
+    } catch (err) {
+        // Log only — never rethrow. A failed invalidation is healed by the TTL.
+        console.warn('[dashboard] Cache invalidation failed:', (err as Error).message);
+    }
+}
+
+// =============================================================================
+// queryDashboardFromDB — pure DB read (no cache concerns)
+// =============================================================================
+
+async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
     //
     // ── Batch 1: Org-level aggregates ─────────────────────────────────────────
     // Five independent count queries run in parallel.
@@ -153,5 +264,6 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
         completionRate: orgCompletionRate,
         employeeStats,
         generatedAt: new Date(),
+        _meta: { source: 'live' },
     };
 }
