@@ -5,11 +5,13 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthProvider';
+import { Web3Provider } from './context/Web3Context';
 import { useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EmployeesPage from './pages/EmployeesPage';
+import TaskBoardPage from './pages/TaskBoardPage';
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
 // Wraps any route that requires a valid session.
@@ -67,7 +69,7 @@ function AppRouter() {
 
       {/* Guest-only — redirect to dashboard if already signed in */}
       <Route element={<GuestRoute />}>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
@@ -75,6 +77,7 @@ function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
+        <Route path="/tasks"     element={<TaskBoardPage />} />
       </Route>
 
       {/* 404 fallback */}
@@ -98,27 +101,35 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRouter />
+        {/*
+          Web3Provider is inside AuthProvider so components can consume
+          both useAuth() and useWeb3Context() in the same tree.
+          Web3 is completely optional — if MetaMask is absent the app
+          behaves identically with all web3 calls being silent no-ops.
+        */}
+        <Web3Provider>
+          <AppRouter />
 
-        {/* Toast notifications */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#1e293b',   // slate-800
-              color: '#f1f5f9',   // slate-100
-              border: '1px solid #334155',  // slate-700
-              borderRadius: '12px',
-              fontSize: '14px',
-            },
-            success: {
-              iconTheme: { primary: '#6366f1', secondary: '#fff' },
-            },
-            error: {
-              iconTheme: { primary: '#ef4444', secondary: '#fff' },
-            },
-          }}
-        />
+          {/* Toast notifications */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background:   '#1e293b',   // slate-800
+                color:        '#f1f5f9',   // slate-100
+                border:       '1px solid #334155',  // slate-700
+                borderRadius: '12px',
+                fontSize:     '14px',
+              },
+              success: {
+                iconTheme: { primary: '#6366f1', secondary: '#fff' },
+              },
+              error: {
+                iconTheme: { primary: '#ef4444', secondary: '#fff' },
+              },
+            }}
+          />
+        </Web3Provider>
       </AuthProvider>
     </BrowserRouter>
   );
