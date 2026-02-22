@@ -114,3 +114,4 @@ export function cacheKey(namespace: string, discriminator: string): string {
 }
 
 export const DASHBOARD_NS = 'dashboard';
+export const AI_SCORE_NS = 'ai:score';

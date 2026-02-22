@@ -5,14 +5,16 @@
 //   GET /api/dashboard — org-level summary + per-employee completion stats.
 //
 // Design decisions:
-//   1. ALL five queries run in a single Promise.all() batch — one round-trip
-//      to the DB connection pool instead of five sequential awaits.
-//   2. Per-employee completion rate is computed in JS, not SQL, to keep the
-//      query simple and avoid a raw Prisma query. At org scale this is fine;
-//      if employee count > 10k, move the ratio to a GROUP BY subquery.
+//   1. Four queries run in a single Promise.all() batch — one round-trip
+//      to the DB connection pool instead of sequential awaits.
+//   2. Per-employee completion stats use task.groupBy({ by: ['assignedTo', 'status'],
+//      _count: { id: true } }). The DB aggregates before transmitting: at most
+//      3 rows per employee (one per status) cross the wire, not one row per task.
+//      Org-level tasksAssigned/tasksCompleted are derived from the same buckets —
+//      no separate task.count() calls needed.
 //   3. orgId scoping is applied on EVERY where clause — never omitted.
-//   4. Unassigned tasks (assignedTo = null) are included in tasksAssigned
-//      because the SPEC does not constrain this count to assigned employees.
+//   4. Unassigned tasks (assignedTo = null) contribute to org-level totals but
+//      are excluded from per-employee stats (null bucket key is skipped).
 //
 // Redis caching (§ Caching Layer):
 //   - TTL: 60 seconds, per-org key (hrms:dashboard:<orgId>)
@@ -25,6 +27,7 @@
 
 import prisma from '../lib/prisma';
 import { getRedis, cacheKey, DASHBOARD_NS } from '../lib/redis';
+import { getLatestScoreMap } from '../lib/performanceLog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,28 +38,40 @@ export interface EmployeeCompletionStat {
     role: string | null;
     department: string | null;
     isActive: boolean;
-    tasksAssigned: number;   // total tasks ever assigned to this employee in this org
-    tasksCompleted: number;   // subset with status = 'completed'
-    completionRate: number;   // tasksCompleted / tasksAssigned, rounded to 3 d.p. (0 if no tasks)
+    tasksAssigned: number;
+    tasksCompleted: number;
+    completionRate: number;
+    productivityScore: number | null; // AI score from performance_logs
+    verifiedTasks: number;          // count of blockchain_logs
+}
+
+/** A single entry in the recent on-chain activity log. */
+export interface RecentBlockchainLog {
+    taskId: string;
+    taskTitle: string;
+    employeeName: string;
+    txHash: string;
+    loggedAt: Date;
 }
 
 /** Top-level shape returned by getDashboardStats(). */
 export interface DashboardStats {
-    // Org-level counters
     totalEmployees: number;
     activeEmployees: number;
-    tasksAssigned: number;    // all tasks in the org (any status)
-    tasksCompleted: number;    // tasks with status = 'completed'
-    completionRate: number;    // org-level ratio, rounded to 3 d.p.
+    tasksAssigned: number;
+    tasksCompleted: number;
+    completionRate: number;
 
-    // Per-employee breakdown — sorted descending by completionRate, then by name
+    // Per-employee breakdown
     employeeStats: EmployeeCompletionStat[];
 
-    // Snapshot timestamp — client can display "data as of …"
+    // Latest on-chain verified completions
+    recentLogs: RecentBlockchainLog[];
+
     generatedAt: Date;
 
     // Cache metadata — tells the client whether this response came from cache
-    _meta: {
+    _meta?: {
         source: 'cache' | 'live';
         cachedAt?: string;   // ISO — present when source === 'cache'
     };
@@ -95,7 +110,7 @@ function dashboardCacheKey(orgId: string): string {
  */
 export async function getDashboardStats(orgId: string): Promise<DashboardStats> {
     const redis = getRedis();
-    const key   = dashboardCacheKey(orgId);
+    const key = dashboardCacheKey(orgId);
 
     // ── 1. Cache read ──────────────────────────────────────────────────────────
     if (redis) {
@@ -103,13 +118,15 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
             const cached = await redis.get(key);
             if (cached) {
                 const data = JSON.parse(cached) as DashboardStats;
-                // Rehydrate generatedAt as a Date (JSON.parse gives a string)
+                // Rehydrate dates
                 data.generatedAt = new Date(data.generatedAt);
+                if (data.recentLogs) {
+                    data.recentLogs = data.recentLogs.map(l => ({ ...l, loggedAt: new Date(l.loggedAt) }));
+                }
                 data._meta = { source: 'cache', cachedAt: data.generatedAt.toISOString() };
                 return data;
             }
         } catch (err) {
-            // Redis GET error (e.g. serialisation issue, timeout) — not fatal.
             console.warn('[dashboard] Redis GET failed — falling back to DB:', (err as Error).message);
         }
     }
@@ -120,12 +137,8 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
     // ── 3. Cache write ─────────────────────────────────────────────────────────
     if (redis) {
         try {
-            // EX sets the TTL in seconds; NX is intentionally NOT used so we
-            // always refresh the cache on a DB hit (no thundering-herd here at
-            // org user count scale).
             await redis.set(key, JSON.stringify(stats), 'EX', DASHBOARD_TTL_SECONDS);
         } catch (err) {
-            // Redis SET failure — silently swallowed; the caller gets live data.
             console.warn('[dashboard] Redis SET failed:', (err as Error).message);
         }
     }
@@ -139,15 +152,6 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
 
 /**
  * Delete the cached dashboard snapshot for an org.
- *
- * Called by task.service.updateTaskStatus() after every status transition so
- * the next GET /api/dashboard reflects the new state within at most one poll
- * cycle (rather than up to 60 s later).
- *
- * Silently no-ops when:
- *   - Redis is disabled (REDIS_URL not set)
- *   - The key does not exist (DEL on missing key is safe in Redis)
- *   - Redis throws (never blocks or crashes the task update flow)
  */
 export async function invalidateDashboardCache(orgId: string): Promise<void> {
     const redis = getRedis();
@@ -155,12 +159,8 @@ export async function invalidateDashboardCache(orgId: string): Promise<void> {
 
     const key = dashboardCacheKey(orgId);
     try {
-        const deleted = await redis.del(key);
-        if (deleted) {
-            console.log(`[dashboard] Cache invalidated for org ${orgId}`);
-        }
+        await redis.del(key);
     } catch (err) {
-        // Log only — never rethrow. A failed invalidation is healed by the TTL.
         console.warn('[dashboard] Cache invalidation failed:', (err as Error).message);
     }
 }
@@ -170,100 +170,120 @@ export async function invalidateDashboardCache(orgId: string): Promise<void> {
 // =============================================================================
 
 async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
-    //
-    // ── Batch 1: Org-level aggregates ─────────────────────────────────────────
-    // Five independent count queries run in parallel.
-    //
     const [
         totalEmployees,
         activeEmployees,
-        tasksAssigned,
-        tasksCompleted,
         employeeRows,
+        taskBuckets,
+        blockchainLogs,
     ] = await Promise.all([
-        // 1. Total employees (active + inactive) in this org
-        prisma.employee.count({
-            where: { orgId },
-        }),
 
-        // 2. Active employees only
-        prisma.employee.count({
-            where: { orgId, isActive: true },
-        }),
+        // 1. Total employees
+        prisma.employee.count({ where: { orgId } }),
 
-        // 3. All tasks in this org (any status, any assignee incl. null)
-        prisma.task.count({
-            where: { orgId },
-        }),
+        // 2. Active employees
+        prisma.employee.count({ where: { orgId, isActive: true } }),
 
-        // 4. Completed tasks
-        prisma.task.count({
-            where: { orgId, status: 'completed' },
-        }),
-
-        // 5. Per-employee task breakdown via raw counts on the Task relation.
-        //
-        //    Prisma doesn't support conditional aggregation in findMany without
-        //    raw SQL, so we fetch both the total task count AND the full task
-        //    list per employee, then compute the completed count in JS below.
-        //
-        //    Alternative: use $queryRaw with GROUP BY — avoided here to keep
-        //    the code Prisma-idiomatic and DB-agnostic for test environments.
+        // 3. Employee metadata
         prisma.employee.findMany({
             where: { orgId },
+            select: { id: true, name: true, role: true, department: true, isActive: true },
+            orderBy: { name: 'asc' },
+        }),
+
+        // 4. Per-(employee, status) task counts
+        prisma.task.groupBy({
+            by: ['assignedTo', 'status'],
+            where: { orgId },
+            _count: { id: true },
+        }),
+
+        // 5. Blockchain logs
+        prisma.blockchainLog.findMany({
+            where: { orgId },
             select: {
-                id: true,
-                name: true,
-                role: true,
-                department: true,
-                isActive: true,
-                // Pull ALL tasks assigned to this employee within this org.
-                // The where clause on the relation join scopes to orgId.
-                tasks: {
-                    where: { orgId },
-                    select: { status: true },
+                txHash: true,
+                loggedAt: true,
+                task: {
+                    select: {
+                        id: true,
+                        title: true,
+                        assignedTo: true,
+                        employee: { select: { name: true } },
+                    },
                 },
             },
-            orderBy: { name: 'asc' },
+            orderBy: { loggedAt: 'desc' },
         }),
     ]);
 
-    // ── Batch 2: Compute per-employee stats in JS ─────────────────────────────
-    const employeeStats: EmployeeCompletionStat[] = employeeRows
-        .map(emp => {
-            const assigned = emp.tasks.length;
-            const completed = emp.tasks.filter(t => t.status === 'completed').length;
-            const rate = assigned > 0
-                ? Math.round((completed / assigned) * 1000) / 1000
-                : 0;
+    // ── Derive org-level totals ────────────────────────────────────────────────
+    let tasksAssigned = 0;
+    let tasksCompleted = 0;
+    for (const bucket of taskBuckets) {
+        tasksAssigned += bucket._count.id;
+        if (bucket.status === 'completed') tasksCompleted += bucket._count.id;
+    }
 
-            return {
-                employeeId: emp.id,
-                name: emp.name,
-                role: emp.role,
-                department: emp.department,
-                isActive: emp.isActive,
-                tasksAssigned: assigned,
-                tasksCompleted: completed,
-                completionRate: rate,
-            };
-        })
-        // Sort: highest completion rate first; break ties by name (already alpha)
-        .sort((a, b) => b.completionRate - a.completionRate || a.name.localeCompare(b.name));
+    // ── Build per-employee task lookup ─────────────────────────────────────────
+    const empCountMap = new Map<string, { assigned: number; completed: number }>();
+    for (const bucket of taskBuckets) {
+        const empId = bucket.assignedTo;
+        if (!empId) continue;
+        const entry = empCountMap.get(empId) ?? { assigned: 0, completed: 0 };
+        entry.assigned += bucket._count.id;
+        if (bucket.status === 'completed') entry.completed += bucket._count.id;
+        empCountMap.set(empId, entry);
+    }
 
-    // Org-level completion rate
-    const orgCompletionRate = tasksAssigned > 0
-        ? Math.round((tasksCompleted / tasksAssigned) * 1000) / 1000
-        : 0;
+    // ── Build verified-count Map ───────────────────────────────────────────────
+    const verifiedCountMap = new Map<string, number>();
+    for (const log of blockchainLogs) {
+        const empId = log.task.assignedTo;
+        if (empId) {
+            verifiedCountMap.set(empId, (verifiedCountMap.get(empId) ?? 0) + 1);
+        }
+    }
+
+    // ── Fetch scores ───────────────────────────────────────────────────────────
+    const employeeIds = employeeRows.map(e => e.id);
+    const scoreMap = await getLatestScoreMap(orgId, employeeIds);
+
+    // ── Assemble stats ─────────────────────────────────────────────────────────
+    const employeeStats: EmployeeCompletionStat[] = employeeRows.map(emp => {
+        const counts = empCountMap.get(emp.id) ?? { assigned: 0, completed: 0 };
+        const rate = counts.assigned > 0 ? (counts.completed / counts.assigned) : 0;
+
+        return {
+            employeeId: emp.id,
+            name: emp.name,
+            role: emp.role,
+            department: emp.department,
+            isActive: emp.isActive,
+            tasksAssigned: counts.assigned,
+            tasksCompleted: counts.completed,
+            completionRate: Math.round(rate * 1000) / 1000,
+            productivityScore: scoreMap.get(emp.id) ?? null,
+            verifiedTasks: verifiedCountMap.get(emp.id) ?? 0,
+        };
+    }).sort((a, b) => b.completionRate - a.completionRate || a.name.localeCompare(b.name));
+
+    const recentLogs: RecentBlockchainLog[] = blockchainLogs.slice(0, 10).map(log => ({
+        taskId: log.task.id,
+        taskTitle: log.task.title,
+        employeeName: log.task.employee?.name ?? 'Unknown',
+        txHash: log.txHash,
+        loggedAt: log.loggedAt,
+    }));
 
     return {
         totalEmployees,
         activeEmployees,
         tasksAssigned,
         tasksCompleted,
-        completionRate: orgCompletionRate,
+        completionRate: tasksAssigned > 0 ? Math.round((tasksCompleted / tasksAssigned) * 1000) / 1000 : 0,
         employeeStats,
+        recentLogs,
         generatedAt: new Date(),
-        _meta: { source: 'live' },
     };
 }

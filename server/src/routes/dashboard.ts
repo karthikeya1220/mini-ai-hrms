@@ -9,7 +9,10 @@
 
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
-import { getDashboardHandler } from '../controllers/dashboard.controller';
+import {
+    getDashboardHandler,
+    getDashboardEmployeesHandler,
+} from '../controllers/dashboard.controller';
 
 const router = Router();
 
@@ -19,5 +22,10 @@ router.use(authMiddleware);
 // ── GET /api/dashboard ────────────────────────────────────────────────────────
 // Org-scoped aggregate statistics + per-employee completion breakdown.
 router.get('/', getDashboardHandler);
+
+// ── GET /api/dashboard/employees ──────────────────────────────────────────────
+// List of all employees with their productivity scores and completed task counts.
+router.get('/employees', getDashboardEmployeesHandler);
+
 
 export default router;

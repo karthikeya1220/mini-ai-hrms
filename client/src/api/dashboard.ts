@@ -14,7 +14,17 @@ export interface EmployeeStat {
     isActive: boolean;
     tasksAssigned: number;
     tasksCompleted: number;
-    completionRate: number;  // 0–1, 3 d.p.
+    completionRate: number;
+    productivityScore: number | null;
+    verifiedTasks: number;
+}
+
+export interface RecentBlockchainLog {
+    taskId: string;
+    taskTitle: string;
+    employeeName: string;
+    txHash: string;
+    loggedAt: string;
 }
 
 export interface DashboardData {
@@ -22,10 +32,12 @@ export interface DashboardData {
     activeEmployees: number;
     tasksAssigned: number;
     tasksCompleted: number;
-    completionRate: number;  // org-level 0–1
+    completionRate: number;
     employeeStats: EmployeeStat[];
-    generatedAt: string;  // ISO string from server
+    recentLogs: RecentBlockchainLog[];
+    generatedAt: string;
 }
+
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 

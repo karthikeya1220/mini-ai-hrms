@@ -112,6 +112,10 @@ model Task {
   @@index([orgId], name: "idx_tasks_org")
   @@index([assignedTo], name: "idx_tasks_assigned")
   @@index([status], name: "idx_tasks_status")
+
+  // Performance: (org_id, status) lookup for dashboard aggregates
+  @@index([orgId, status])
+
   @@map("tasks")
 }
 
@@ -145,6 +149,10 @@ model PerformanceLog {
   // Primary query pattern: WHERE org_id = ? AND employee_id = ? ORDER BY computed_at DESC
   // Covers date-ranged score history and latest-score lookups without a heap scan.
   @@index([orgId, employeeId, computedAt(sort: Desc)], name: "idx_perf_org_employee_date")
+
+  // Performance: score trend/history lookups for a specific employee
+  @@index([employeeId, computedAt(sort: Desc)])
+
   @@map("performance_logs")
 }
 
@@ -167,6 +175,10 @@ model BlockchainLog {
 
   // FK: task_id → tasks(id)           (no CASCADE — same audit-preservation rationale)
   task Task @relation(fields: [taskId], references: [id])
+
+  // Performance: audit trail lookups
+  @@index([orgId])
+  @@index([taskId])
 
   @@map("blockchain_logs")
 }

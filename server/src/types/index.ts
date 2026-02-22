@@ -86,7 +86,9 @@ export interface TaskRow {
 }
 
 // Shape returned to API consumers — orgId excluded
-export type TaskResponse = Omit<TaskRow, 'orgId'>;
+export interface TaskResponse extends Omit<TaskRow, 'orgId'> {
+    txHash?: string | null;
+}
 
 // ─── Status FSM ───────────────────────────────────────────────────────────────
 // SPEC § 2.3: assigned → in_progress → completed (forward-only)

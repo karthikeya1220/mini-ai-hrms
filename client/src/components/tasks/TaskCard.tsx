@@ -143,6 +143,21 @@ export function TaskCard({
                 <p className={`text-sm font-medium leading-snug flex-1 ${task.status === 'completed' ? 'line-through text-slate-500' : 'text-slate-100'}`}>
                     {task.title}
                 </p>
+                {task.txHash && (
+                    <a
+                        href={`https://amoy.polygonscan.com/tx/${task.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 text-violet-400 hover:text-violet-300 transition-colors"
+                        title="On-chain verified"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                    </a>
+                )}
             </div>
 
             {/* Description preview */}

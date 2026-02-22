@@ -41,6 +41,7 @@ export interface Task {
     dueDate: string | null;     // ISO
     completedAt: string | null;     // ISO
     createdAt: string;            // ISO
+    txHash?: string | null;
 }
 
 export interface PaginatedTasks {

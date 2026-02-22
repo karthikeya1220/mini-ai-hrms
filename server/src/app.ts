@@ -21,6 +21,22 @@ export function createApp(): Express {
         .split(',')
         .map((o) => o.trim());
 
+    // ── Startup Guard ────────────────────────────────────────────────────────
+    // SPEC § 5.4 Safety: In production, we MUST NOT allow localhost as an origin.
+    // This prevents accidental exposure where an attacker could leverage a user's
+    // local development environment to bypass CORS.
+    if (process.env.NODE_ENV === 'production') {
+        const hasLocalhost = allowedOrigins.some(o =>
+            o.includes('localhost') || o.includes('127.0.0.1')
+        );
+        if (hasLocalhost) {
+            throw new Error(
+                '[startup] SECURITY VIOLATION: ALLOWED_ORIGINS contains localhost in production. ' +
+                'Update your environment variables to use a real domain.'
+            );
+        }
+    }
+
     app.use(
         cors({
             origin: (origin, callback) => {

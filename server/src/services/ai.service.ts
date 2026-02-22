@@ -43,6 +43,7 @@ import {
     getScoreHistory,
     getLatestScoreMap,
 } from '../lib/performanceLog';
+import { getRedis, cacheKey, AI_SCORE_NS } from '../lib/redis';
 
 // =============================================================================
 // § 1 — Shared Types
@@ -145,6 +146,15 @@ export async function computeProductivityScore(
         `org=${orgId} task=${taskId} employee=${employeeId} ` +
         `score=${logRecord.score ?? 'null (no tasks)'} log=${logRecord.id}`,
     );
+
+    // ── Invalidate cache ─────────────────────────────────────────────────────
+    const redis = getRedis();
+    if (redis) {
+        const key = cacheKey(AI_SCORE_NS, employeeId);
+        await redis.del(key).catch(err => {
+            console.warn('[ai.service] Cache invalidation failed:', (err as Error).message);
+        });
+    }
 }
 
 // =============================================================================
@@ -164,7 +174,25 @@ export async function getScore(
     orgId: string,
     employeeId: string,
 ): Promise<ProductivityScoreResult> {
-    // ── Ownership check ────────────────────────────────────────────────────────
+    const redis = getRedis();
+    const key = cacheKey(AI_SCORE_NS, employeeId);
+
+    // ── 1. Cache read ──────────────────────────────────────────────────────────
+    if (redis) {
+        try {
+            const cached = await redis.get(key);
+            if (cached) {
+                const data = JSON.parse(cached) as ProductivityScoreResult;
+                data.computedAt = new Date(data.computedAt);
+                return data;
+            }
+        } catch (err) {
+            console.warn('[ai.service] Redis GET failed:', (err as Error).message);
+        }
+    }
+
+    // ── 2. DB query ────────────────────────────────────────────────────────────
+    // Ownership check
     const employee = await prisma.employee.findFirst({
         where: { id: employeeId, orgId },
         select: { id: true, name: true },
@@ -173,7 +201,7 @@ export async function getScore(
         throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
     }
 
-    // ── Fetch all tasks for this employee ──────────────────────────────────────
+    // Fetch all tasks for this employee
     const assigned = await prisma.task.findMany({
         where: { orgId, assignedTo: employeeId },
         select: { status: true, complexityScore: true, dueDate: true, completedAt: true },
@@ -182,7 +210,7 @@ export async function getScore(
     const result = computeScoreFromTasks(assigned);
     const trend = await computeTrend(orgId, employeeId);
 
-    return {
+    const scoreResult: ProductivityScoreResult = {
         employeeId,
         name: employee.name,
         score: result.score,
@@ -191,6 +219,18 @@ export async function getScore(
         trend,
         computedAt: new Date(),
     };
+
+    // ── 3. Cache write ─────────────────────────────────────────────────────────
+    if (redis) {
+        try {
+            // TTL: 5 minutes (300 seconds)
+            await redis.set(key, JSON.stringify(scoreResult), 'EX', 300);
+        } catch (err) {
+            console.warn('[ai.service] Redis SET failed:', (err as Error).message);
+        }
+    }
+
+    return scoreResult;
 }
 
 // =============================================================================

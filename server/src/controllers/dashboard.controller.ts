@@ -14,10 +14,12 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import { sendSuccess } from '../utils/response';
-import { getDashboardStats } from '../services/dashboard.service';
+import {
+    getDashboardStats,
+    getDashboardEmployees,
+} from '../services/dashboard.service';
 
 // ─── GET /api/dashboard ───────────────────────────────────────────────────────
-
 /**
  * Returns org-level aggregate statistics and a per-employee completion
  * breakdown, all scoped to the orgId from the JWT.
@@ -58,3 +60,28 @@ export async function getDashboardHandler(
         next(err);
     }
 }
+
+// ─── GET /api/dashboard/employees ─────────────────────────────────────────────
+
+/**
+ * Returns a list of all employees in the organization with their latest
+ * productivity score and completed task count.
+ *
+ * Scoped to the orgId from the JWT.
+ */
+export async function getDashboardEmployeesHandler(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const orgId = req.org!.id;
+
+        const employees = await getDashboardEmployees(orgId);
+
+        sendSuccess(res, employees);
+    } catch (err) {
+        next(err);
+    }
+}
+

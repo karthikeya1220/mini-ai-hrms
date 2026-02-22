@@ -47,13 +47,20 @@ const TASK_SELECT = {
     dueDate: true,
     completedAt: true,
     createdAt: true,
+    blockchainLogs: {
+        select: { txHash: true },
+        take: 1,
+    },
 } as const;
 
-/** Strip orgId before sending to client. */
-export function toResponse(row: TaskRow): TaskResponse {
-    const { orgId: _stripped, ...safe } = row;
+/** Strip orgId before sending to client and flatten txHash. */
+export function toResponse(row: any): TaskResponse {
+    const { orgId: _stripped, blockchainLogs, ...safe } = row;
     void _stripped;
-    return safe;
+    return {
+        ...safe,
+        txHash: blockchainLogs?.[0]?.txHash ?? null,
+    };
 }
 
 // ─── CREATE ───────────────────────────────────────────────────────────────────

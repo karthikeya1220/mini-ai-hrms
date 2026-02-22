@@ -11,7 +11,6 @@ import { useDashboard } from '../hooks/useDashboard';
 import { StatCard } from '../components/dashboard/StatCard';
 import { CompletionChart } from '../components/dashboard/CompletionChart';
 import { ScoreBadge } from '../components/dashboard/ScoreBadge';
-import { Spinner } from '../components/ui';
 
 // ─── SVG icon helpers ────────────────────────────────────────────────────────
 
@@ -289,7 +288,7 @@ export default function DashboardPage() {
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-slate-800/60">
-                                                {['Employee', 'Role / Dept', 'Tasks', 'Progress', 'Score', 'Status'].map(h => (
+                                                {['Employee', 'Role / Dept', 'Tasks', 'On-chain', 'Progress', 'Score', 'Status'].map(h => (
                                                     <th key={h} className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-600 first:pl-6">
                                                         {h}
                                                     </th>
@@ -334,14 +333,30 @@ export default function DashboardPage() {
                                                         <span className="text-slate-600"> / {emp.tasksAssigned}</span>
                                                     </td>
 
+                                                    {/* On-chain verified indicator */}
+                                                    <td className="px-6 py-3.5">
+                                                        {emp.verifiedTasks > 0 ? (
+                                                            <div className="flex items-center gap-1.5 text-violet-400 font-medium text-xs">
+                                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                                                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                                                                </svg>
+                                                                <span>{emp.verifiedTasks} log{emp.verifiedTasks !== 1 ? 's' : ''}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-700 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
                                                     {/* Progress bar */}
                                                     <td className="px-6 py-3.5">
                                                         <MiniBar rate={emp.completionRate} />
                                                     </td>
 
-                                                    {/* Score badge */}
+                                                    {/* Score badge (uses AI productivity score) */}
                                                     <td className="px-6 py-3.5">
-                                                        <ScoreBadge rate={emp.completionRate} size="sm" />
+                                                        <ScoreBadge rate={(emp.productivityScore ?? 0) / 100} size="sm" />
                                                     </td>
 
                                                     {/* Active indicator */}
@@ -355,6 +370,63 @@ export default function DashboardPage() {
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                            )}
+                        </section>
+
+                        {/* ── Recent Verified Tasks (Blockchain Log) ──────────────────── */}
+                        <section className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-base font-semibold text-white">Recent on-chain activity</h2>
+                                <span className="text-xs text-slate-500">Polygon Amoy Network</span>
+                            </div>
+
+                            {data.recentLogs.length === 0 ? (
+                                <div className="rounded-2xl border border-dashed border-slate-800 p-8 text-center bg-slate-900/40">
+                                    <svg className="w-8 h-8 text-slate-800 mx-auto mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                    </svg>
+                                    <p className="text-slate-600 text-sm italic">No on-chain events recorded yet.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {data.recentLogs.map(log => (
+                                        <div
+                                            key={log.txHash}
+                                            className="group p-4 rounded-2xl border border-slate-800 bg-slate-900/60 hover:border-violet-500/30 transition-all hover:translate-y-[-2px]"
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-400 group-hover:bg-violet-500/20 transition-colors">
+                                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                        <polyline points="22 4 12 14.01 9 11.01" />
+                                                    </svg>
+                                                </div>
+                                                <a
+                                                    href={`https://amoy.polygonscan.com/tx/${log.txHash}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[10px] tabular-nums text-slate-500 hover:text-violet-400 border border-slate-800 rounded-md px-1.5 py-0.5 flex items-center gap-1 group-hover:border-violet-500/20"
+                                                >
+                                                    {log.txHash.slice(0, 8)}...{log.txHash.slice(-6)}
+                                                    <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                                        <polyline points="15 3 21 3 21 9" />
+                                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                                    </svg>
+                                                </a>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-200 line-clamp-1 group-hover:text-white transition-colors">
+                                                {log.taskTitle}
+                                            </p>
+                                            <div className="flex items-center justify-between mt-3">
+                                                <span className="text-xs text-slate-500 font-medium">{log.employeeName}</span>
+                                                <span className="text-[10px] text-slate-600">
+                                                    {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </section>
