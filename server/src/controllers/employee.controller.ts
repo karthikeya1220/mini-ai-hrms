@@ -88,12 +88,19 @@ export async function createEmployeeHandler(
         const orgId = requireOrgId(req);
         const input = CreateEmployeeSchema.parse(req.body);
 
-        const employee = await createEmployee(orgId, {
+        const { employee, user, temporaryPassword } = await createEmployee(orgId, {
             ...input,
             role: input.role as any,
         });
 
-        sendSuccess(res, toResponse(employee), 201);
+        // Return the employee record (orgId stripped), the linked user account
+        // (passwordHash never included), and the temporary password so the
+        // admin can relay it to the new employee out-of-band.
+        sendSuccess(res, {
+            employee:          toResponse(employee),
+            user,
+            temporaryPassword, // plain-text, returned exactly once — never stored again
+        }, 201);
     } catch (err) {
         next(err);
     }

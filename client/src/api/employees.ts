@@ -1,34 +1,11 @@
-// api/employees.ts — typed wrappers for /api/employees/* and /api/ai/score/:id
+// api/employees.ts — typed wrappers for /api/employees/* and /api/ai/*
+//
+// All calls use the shared Axios client (api/client.ts).
+// Authorization header and TOKEN_EXPIRED refresh are handled automatically.
+// Token is no longer a parameter on any function — it is read from memory
+// by the request interceptor on every call.
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
-
-// ─── Shared helper ────────────────────────────────────────────────────────────
-
-async function authFetch<T>(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method,
-        credentials: 'include',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-        const msg = (json as { message?: string }).message ?? `Request failed (${res.status})`;
-        throw new Error(msg);
-    }
-
-    return (json as { success: true; data: T }).data;
-}
+import { client } from './client';
 
 // ─── Employee types ───────────────────────────────────────────────────────────
 
@@ -88,7 +65,7 @@ export interface ListParams {
     cursor?: string;
 }
 
-export function listEmployees(token: string, params: ListParams = {}): Promise<PaginatedEmployees> {
+export async function listEmployees(params: ListParams = {}): Promise<PaginatedEmployees> {
     const qs = new URLSearchParams();
     if (params.department) qs.set('department', params.department);
     if (params.role) qs.set('role', params.role);
@@ -96,29 +73,30 @@ export function listEmployees(token: string, params: ListParams = {}): Promise<P
     if (params.limit) qs.set('limit', String(params.limit));
     if (params.cursor) qs.set('cursor', params.cursor);
     const query = qs.toString() ? `?${qs}` : '';
-    return authFetch<PaginatedEmployees>('GET', `/employees${query}`, token);
+    const res = await client.get<{ success: true; data: PaginatedEmployees }>(`/employees${query}`);
+    return res.data.data;
 }
 
-export function createEmployee(token: string, data: EmployeeInput): Promise<Employee> {
-    return authFetch<Employee>('POST', '/employees', token, data);
+export async function createEmployee(data: EmployeeInput): Promise<Employee> {
+    const res = await client.post<{ success: true; data: Employee }>('/employees', data);
+    return res.data.data;
 }
 
-export function updateEmployee(
-    token: string,
-    id: string,
-    data: Partial<EmployeeInput>,
-): Promise<Employee> {
-    return authFetch<Employee>('PUT', `/employees/${id}`, token, data);
+export async function updateEmployee(id: string, data: Partial<EmployeeInput>): Promise<Employee> {
+    const res = await client.put<{ success: true; data: Employee }>(`/employees/${id}`, data);
+    return res.data.data;
 }
 
 /** Soft-delete — sets isActive = false, returns updated employee */
-export function deactivateEmployee(token: string, id: string): Promise<Employee> {
-    return authFetch<Employee>('DELETE', `/employees/${id}`, token);
+export async function deactivateEmployee(id: string): Promise<Employee> {
+    const res = await client.delete<{ success: true; data: Employee }>(`/employees/${id}`);
+    return res.data.data;
 }
 
 // ─── AI score ─────────────────────────────────────────────────────────────────
 
 /** GET /api/ai/score/:employeeId */
-export function getEmployeeScore(token: string, employeeId: string): Promise<ProductivityScore> {
-    return authFetch<ProductivityScore>('GET', `/ai/score/${employeeId}`, token);
+export async function getEmployeeScore(employeeId: string): Promise<ProductivityScore> {
+    const res = await client.get<{ success: true; data: ProductivityScore }>(`/ai/score/${employeeId}`);
+    return res.data.data;
 }

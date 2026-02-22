@@ -1,14 +1,14 @@
 // =============================================================================
 // pages/LoginPage.tsx
 //
-// Authentication is maintained at Supabase.
-// Redirect: /dashboard after successful login
+// Calls login() from AuthContext which runs apiLogin → setToken → apiMe.
+// Redirect: /dashboard (or the ?from= page) after successful login.
 // =============================================================================
 
 import { useState, useId } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { FloatingInput, LogoMark, Spinner, EyeIcon } from '../components/ui';
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ function validate(email: string, password: string) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,16 +50,9 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const { data, error: sbError } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (sbError) {
-        throw sbError;
-      }
-
-      if (data.session) {
-        toast.success('Welcome back! 👋', { duration: 3000 });
-        navigate(from, { replace: true });
-      }
+      await login(email, password);
+      toast.success('Welcome back! 👋', { duration: 3000 });
+      navigate(from, { replace: true });
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
@@ -163,11 +157,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Footer note */}
-        <p className="mt-6 text-center text-xs text-slate-600">
-          Authentication is maintained at Supabase for enhanced security.
-        </p>
       </div>
     </div>
   );

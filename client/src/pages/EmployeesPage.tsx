@@ -149,7 +149,7 @@ function FilterPill({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EmployeesPage() {
-    const { user, org, accessToken, logout } = useAuth();
+    const { user, org, logout } = useAuth();
 
     // ── Filters ────────────────────────────────────────────────────────────────
     const [search, setSearch] = useState('');
@@ -162,7 +162,7 @@ export default function EmployeesPage() {
     };
 
     const { employees, total, loading, error, refetch, addEmployee, editEmployee, removeEmployee } =
-        useEmployees(accessToken, apiParams);
+        useEmployees(apiParams);
 
     // ── Panel state ────────────────────────────────────────────────────────────
     const [modal, setModal] = useState<'add' | 'edit' | null>(null);
@@ -512,10 +512,9 @@ export default function EmployeesPage() {
                 />
             )}
 
-            {scoreTarget && accessToken && (
+            {scoreTarget && (
                 <ScorePanel
                     employee={scoreTarget}
-                    token={accessToken}
                     onClose={() => setScoreTarget(null)}
                 />
             )}

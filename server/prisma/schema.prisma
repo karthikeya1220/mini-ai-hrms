@@ -8,6 +8,10 @@
 //   - All five indexes cited in the SPEC are reproduced as @@index directives.
 //   - No fields are added beyond what the SPEC defines.
 //   - Field naming: camelCase in Prisma, snake_case via @map / @@map for DB.
+//
+// RBAC addition (AUTH_SYSTEM.md):
+//   - Role enum  — ADMIN | EMPLOYEE (replaces unconstrained VARCHAR on Employee)
+//   - User model — owns credentials and session metadata; bridges Org + Employee
 // =============================================================================
 
 generator client {
@@ -17,6 +21,16 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLE ENUM
+// Replaces the unconstrained VARCHAR(100) used on Employee.role.
+// Enforced at the Postgres type level — no CHECK constraint needed.
+// ─────────────────────────────────────────────────────────────────────────────
+enum Role {
+  ADMIN
+  EMPLOYEE
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,12 +45,58 @@ model Organization {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
+  users            User[]
   employees        Employee[]
   tasks            Task[]
   blockchainLogs   BlockchainLog[]
   performanceLogs  PerformanceLog[]
 
   @@map("organizations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER  (Auth identity — AUTH_SYSTEM.md)
+//
+// Owns credentials and session state.  Separate from Employee so that auth
+// concerns are decoupled from business-logic profile data.
+//
+// Key design decisions:
+//   - employeeId is optional + unique: a User may exist before an Employee
+//     profile is created (e.g. org owner at registration time), and each
+//     Employee profile maps to at most one User.
+//   - role is the Role enum, enforced at the Postgres type level.
+//   - tokenVersion is incremented on password-change or explicit logout to
+//     invalidate all outstanding JWTs without a token blocklist.
+//   - email is globally unique across all orgs (unlike Employee.email which
+//     is unique per-org only); this is the canonical login identifier.
+// ─────────────────────────────────────────────────────────────────────────────
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  employeeId   String?  @unique @map("employee_id") @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.Text
+  role         Role     @default(EMPLOYEE)
+  tokenVersion Int      @default(0) @map("token_version")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // FK: org_id → organizations(id) ON DELETE CASCADE
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // FK: employee_id → employees(id) ON DELETE SET NULL
+  // Optional 1-to-1: a User can exist without an Employee profile, and
+  // deleting an Employee profile does not destroy the auth User.
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  // Fast lookup by org — used when listing org members or invalidating all
+  // sessions for a tenant.
+  @@index([orgId], name: "idx_users_org")
+
+  // Composite: (org_id, email) for login lookup scoped to a tenant where needed.
+  @@index([orgId, email], name: "idx_users_org_email")
+
+  @@map("users")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,6 +126,7 @@ model Employee {
   // Relations
   tasks           Task[]
   performanceLogs PerformanceLog[]
+  user            User?
 
   // SPEC: UNIQUE(org_id, email)
   @@unique([orgId, email])

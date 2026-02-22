@@ -136,8 +136,8 @@ function MiniBar({ rate }: { rate: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-    const { user, org, accessToken, logout } = useAuth();
-    const { data, loading, error, refetch } = useDashboard(accessToken);
+    const { user, org, logout } = useAuth();
+    const { data, loading, error, refetch } = useDashboard();
 
     const updatedAt = data?.generatedAt
         ? new Date(data.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

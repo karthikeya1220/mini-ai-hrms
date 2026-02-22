@@ -1,34 +1,34 @@
 // =============================================================================
-// context/AuthContext.tsx — global auth state.
+// context/AuthContext.tsx — global auth state shape and hook.
 //
-// Stores:
-//   - accessToken  in React state (memory only — never localStorage / sessionStorage)
-//   - org          in React state (id, name, email)
+// accessToken is intentionally NOT in the context value — it lives in
+// api/client.ts module memory and is attached to every request automatically
+// by the Axios interceptor.  Components never need the raw token.
 //
-// The refreshToken lives in an httpOnly cookie managed entirely by the
-// browser — JS never reads or writes it.
-//
-// On mount, the context attempts a silent token refresh via the cookie so
-// users don't have to re-login after a page reload (as long as their 7-day
-// refresh token is still valid).
+// The refreshToken lives in an httpOnly cookie managed by the browser.
 // =============================================================================
 
 import { createContext, useContext } from 'react';
 import type { OrgInfo, UserInfo } from '../api/auth';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Re-export so callers can import types from one place.
+export type { OrgInfo, UserInfo };
 
-interface AuthState {
-    accessToken: string | null;
+// ─── Context value ─────────────────────────────────────────────────────────────
+
+export interface AuthContextValue {
+    // State
     user: UserInfo | null;
     org: OrgInfo | null;
-    isLoading: boolean;       // true while the initial silent refresh is running
-}
+    isLoading: boolean;
 
-export interface AuthContextValue extends AuthState {
-    /** Call after a successful login or register to store the session. */
-    setSession: (accessToken: string, user: UserInfo, org: OrgInfo) => void;
-    /** Logs out — clears state + revokes cookie server-side. */
+    // Derived flags — computed in AuthProvider, never stored in React state
+    isAuthenticated: boolean;   // user !== null
+    isAdmin: boolean;           // user?.role === 'ADMIN'
+    isEmployee: boolean;        // user?.role === 'EMPLOYEE'
+
+    // Actions
+    login: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
 }
 

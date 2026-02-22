@@ -3,8 +3,10 @@
 //
 // SPEC § 2.4: GET /api/dashboard (protected)
 //
-// Auth: authMiddleware applied at router.use() — protects all routes in this
-// file unconditionally. Any new dashboard endpoint inherits protection.
+// Auth: admin only on every route — dashboard aggregates are org-wide data
+// that employees must not read.  Per-route chains used (not router.use) for
+// consistency with the rest of the codebase and to make the gate explicit on
+// each line.
 // =============================================================================
 
 import { Router } from 'express';
@@ -16,17 +18,14 @@ import {
 
 const router = Router();
 
-// Enforce JWT and ADMIN role on every route in this file.
-router.use(authMiddleware);
-router.use(authorize(['ADMIN']));
-
 // ── GET /api/dashboard ────────────────────────────────────────────────────────
 // Org-scoped aggregate statistics + per-employee completion breakdown.
-router.get('/', getDashboardHandler);
+// Admin only — employees must not see org-wide productivity data.
+router.get('/',          authMiddleware, authorize(['ADMIN']), getDashboardHandler);
 
 // ── GET /api/dashboard/employees ──────────────────────────────────────────────
-// List of all employees with their productivity scores and completed task counts.
-router.get('/employees', getDashboardEmployeesHandler);
-
+// All employees with their productivity scores and completed task counts.
+// Admin only — an employee must not read another employee's score via this route.
+router.get('/employees', authMiddleware, authorize(['ADMIN']), getDashboardEmployeesHandler);
 
 export default router;

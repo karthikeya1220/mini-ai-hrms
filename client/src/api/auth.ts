@@ -1,119 +1,97 @@
 // =============================================================================
-// api/auth.ts — typed API wrappers for /api/auth/* endpoints.
+// api/auth.ts — typed wrappers for /api/auth/* and /api/me endpoints.
 //
-// Security model (mirrors server contract exactly):
-//   - accessToken  → returned in JSON body → stored in React context (memory)
-//   - refreshToken → set by server as httpOnly cookie → never touched in JS
+// All calls go through the shared Axios client (api/client.ts) which:
+//   - Attaches Authorization: Bearer automatically from the in-memory token.
+//   - Handles TOKEN_EXPIRED → silent refresh → retry transparently.
 //
-// All fetch calls set credentials: 'include' so the browser automatically
-// sends / receives the httpOnly cookie on auth routes.
+// setToken / clearToken are re-exported here so AuthProvider only imports
+// from api/auth (single import point for auth concerns).
+//
+// withCredentials is set globally on the client instance — the browser sends
+// and receives the httpOnly refresh cookie on every call automatically.
 // =============================================================================
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
+import { client, setToken, clearToken } from './client';
+
+export { setToken, clearToken };
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
 export interface OrgInfo {
-  id: string;
-  name: string;
+    id: string;
+    name: string;
 }
 
 export interface UserInfo {
-  id: string;
-  name: string;
-  email: string;
-  role: 'ADMIN' | 'EMPLOYEE';
+    id: string;
+    email: string;
+    role: 'ADMIN' | 'EMPLOYEE';
+    employeeId: string | null;
 }
 
 export interface AuthResponse {
-  accessToken: string;
-  refreshToken: string;
-  user: UserInfo;
-  org: OrgInfo;
+    accessToken: string;
+    user: UserInfo;
 }
 
-export interface ApiError {
-  success: false;
-  error: string;   // machine-readable code
-  message: string;   // human-readable
-  statusCode: number;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    credentials: 'include',    // sends/receives the httpOnly refresh cookie
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  const json = await res.json();
-
-  if (!res.ok) {
-    // Surface the server's error shape so callers can show exact messages
-    const err = json as ApiError;
-    throw new Error(err.message ?? `Request failed (${res.status})`);
-  }
-
-  // Server wraps all success responses in { success: true, data: … }
-  return (json as { success: true; data: T }).data;
-}
-
-// ─── Auth endpoints ───────────────────────────────────────────────────────────
+// ─── POST /auth/register ──────────────────────────────────────────────────────
 
 export interface RegisterInput {
-  name: string;
-  email: string;
-  password: string;
+    orgName: string;
+    email: string;
+    password: string;
 }
 
-/** POST /api/auth/register — creates org + returns accessToken + org info */
 export async function apiRegister(input: RegisterInput): Promise<AuthResponse> {
-  return post<AuthResponse>('/auth/register', input);
+    const res = await client.post<{ success: true; data: AuthResponse }>('/auth/register', input);
+    return res.data.data;
 }
+
+// ─── POST /auth/login ─────────────────────────────────────────────────────────
 
 export interface LoginInput {
-  email: string;
-  password: string;
+    email: string;
+    password: string;
 }
 
-/** POST /api/auth/login — authenticates org + returns accessToken + org info */
 export async function apiLogin(input: LoginInput): Promise<AuthResponse> {
-  return post<AuthResponse>('/auth/login', input);
+    const res = await client.post<{ success: true; data: AuthResponse }>('/auth/login', input);
+    return res.data.data;
 }
 
-/** POST /api/auth/logout — revokes refresh token cookie server-side */
-export async function apiLogout(accessToken: string): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
-}
+// ─── POST /auth/refresh ───────────────────────────────────────────────────────
+// Sends the httpOnly refresh cookie (withCredentials is global on the client).
+// Returns the new accessToken string only — the refresh cookie is rotated
+// server-side and set on the response automatically.
+//
+// Normal callers do NOT need to call this manually — the response interceptor
+// in client.ts triggers it automatically on TOKEN_EXPIRED.  This export exists
+// for AuthProvider's silent-refresh-on-mount use case.
 
-/** POST /api/auth/refresh — issues new accessToken using httpOnly cookie */
 export async function apiRefresh(): Promise<string> {
-  const data = await post<{ accessToken: string }>('/auth/refresh', {});
-  return data.accessToken;
+    const res = await client.post<{ success: true; data: { accessToken: string } }>('/auth/refresh');
+    return res.data.data.accessToken;
 }
 
-/** GET /api/me — returns current authenticated user details */
-export async function apiMe(accessToken: string): Promise<{ user: UserInfo; org: OrgInfo }> {
-  const res = await fetch(`${API_BASE}/me`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
+// ─── POST /auth/logout ────────────────────────────────────────────────────────
+// Server revokes the refresh token (increments tokenVersion).
+// The Authorization header is attached automatically by the request interceptor.
 
-  const json = await res.json();
-  if (!res.ok) throw new Error((json as { message?: string }).message ?? 'Failed to fetch user details');
+export async function apiLogout(): Promise<void> {
+    await client.post('/auth/logout');
+}
 
-  return (json as { success: true; data: { user: UserInfo; org: OrgInfo } }).data;
+// ─── GET /api/me ──────────────────────────────────────────────────────────────
+// Returns the currently authenticated user + org info.
+// Authorization header is attached automatically by the request interceptor.
+
+export interface MeResponse {
+    user: UserInfo;
+    org: OrgInfo;
+}
+
+export async function apiMe(): Promise<MeResponse> {
+    const res = await client.get<{ success: true; data: MeResponse }>('/me');
+    return res.data.data;
 }

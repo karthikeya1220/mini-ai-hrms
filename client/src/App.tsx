@@ -2,76 +2,32 @@
 // App.tsx — root component: router + providers + toast container
 // =============================================================================
 
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthProvider';
 import { Web3Provider } from './context/Web3Context';
 import { useAuth } from './context/AuthContext';
+import { ProtectedRoute } from './components/routing';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EmployeesPage from './pages/EmployeesPage';
 import TaskBoardPage from './pages/TaskBoardPage';
 
-// ─── ProtectedRoute ───────────────────────────────────────────────────────────
-// Wraps any route that requires a valid session.
-// While the silent refresh is running (isLoading), renders nothing to avoid
-// a flash of the login page. Once resolved, redirects unauthenticated users
-// to /login with { state: { from } } so login can redirect them back.
-
-function ProtectedRoute() {
-  const { accessToken, isLoading } = useAuth();
-  const location = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  if (!accessToken) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  }
-
-  return <Outlet />;
-}
-
-// ─── AdminRoute ─────────────────────────────────────────────────────────────
-// Restricts access to ADMIN role only.
-function AdminRoute() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  if (user?.role !== 'ADMIN') {
-    return <Navigate to="/tasks" replace />;
-  }
-
-  return <Outlet />;
-}
-
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from /login and /register.
 function GuestRoute() {
-  const { accessToken, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-950">
         <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
       </div>
     );
   }
 
-  if (accessToken) {
+  if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -92,16 +48,16 @@ function AppRouter() {
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
-      {/* Protected — redirect to login if not signed in */}
+      {/* Protected — redirect to /login if not signed in */}
       <Route element={<ProtectedRoute />}>
-        {/* Admin-only routes */}
-        <Route element={<AdminRoute />}>
+        {/* Admin-only — redirect to /tasks if signed in but not admin */}
+        <Route element={<ProtectedRoute requireAdmin />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
         </Route>
 
         {/* Everyone (Admin & Employee) routes */}
-        <Route path="/tasks"     element={<TaskBoardPage />} />
+        <Route path="/tasks" element={<TaskBoardPage />} />
       </Route>
 
       {/* 404 fallback */}

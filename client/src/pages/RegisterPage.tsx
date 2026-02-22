@@ -12,7 +12,6 @@ import { useState, useId } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiRegister } from '../api/auth';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { FloatingInput, LogoMark, Spinner, EyeIcon } from '../components/ui';
 
@@ -59,7 +58,7 @@ function strengthOf(pwd: string): { score: number; label: string; color: string 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
-    const { setSession } = useAuth();
+    const { login } = useAuth();
     const navigate = useNavigate();
     const uid = useId();
 
@@ -89,16 +88,11 @@ export default function RegisterPage() {
 
         setLoading(true);
         try {
-            const data = await apiRegister({ name, email, password });
-
-            // Set session in Supabase SDK for future auto-refresh
-            await supabase.auth.setSession({
-                access_token: data.accessToken,
-                refresh_token: data.refreshToken,
-            });
-
-            setSession(data.accessToken, data.user, data.org);
-            toast.success(`Welcome to mini-AI HRMS, ${data.user.name}! 🎉`, { duration: 4000 });
+            // 1. Create account + org
+            await apiRegister({ orgName: name, email, password });
+            // 2. Re-use the login action to hydrate auth state (sets token + fetches /me)
+            await login(email, password);
+            toast.success('Welcome to mini-AI HRMS! 🎉', { duration: 4000 });
             navigate('/dashboard', { replace: true });
         } catch (err: unknown) {
             setApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');

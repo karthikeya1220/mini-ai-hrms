@@ -1,28 +1,10 @@
 // api/tasks.ts — typed wrappers for /api/tasks/*
+//
+// All calls use the shared Axios client (api/client.ts).
+// Authorization header and TOKEN_EXPIRED refresh are handled automatically.
+// Token is no longer a parameter on any function.
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
-
-// ─── Shared ───────────────────────────────────────────────────────────────────
-
-async function authFetch<T>(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method,
-        credentials: 'include',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((json as { message?: string }).message ?? `Request failed (${res.status})`);
-    return (json as { success: true; data: T }).data;
-}
+import { client } from './client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,34 +59,39 @@ export const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-export function listTasks(token: string, params: ListTaskParams = {}): Promise<PaginatedTasks> {
+export async function listTasks(params: ListTaskParams = {}): Promise<PaginatedTasks> {
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.assignedTo) qs.set('assignedTo', params.assignedTo);
     if (params.priority) qs.set('priority', params.priority);
     if (params.limit) qs.set('limit', String(params.limit));
     if (params.cursor) qs.set('cursor', params.cursor);
-    return authFetch<PaginatedTasks>('GET', `/tasks${qs.toString() ? '?' + qs : ''}`, token);
+    const res = await client.get<{ success: true; data: PaginatedTasks }>(`/tasks${qs.toString() ? '?' + qs : ''}`);
+    return res.data.data;
 }
 
-export function listMyTasks(token: string, params: ListTaskParams = {}): Promise<PaginatedTasks> {
+export async function listMyTasks(params: ListTaskParams = {}): Promise<PaginatedTasks> {
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.priority) qs.set('priority', params.priority);
     if (params.limit) qs.set('limit', String(params.limit));
     if (params.cursor) qs.set('cursor', params.cursor);
-    return authFetch<PaginatedTasks>('GET', `/tasks/my${qs.toString() ? '?' + qs : ''}`, token);
+    const res = await client.get<{ success: true; data: PaginatedTasks }>(`/tasks/my${qs.toString() ? '?' + qs : ''}`);
+    return res.data.data;
 }
 
-export function createTask(token: string, data: CreateTaskInput): Promise<Task> {
-    return authFetch<Task>('POST', '/tasks', token, data);
+export async function createTask(data: CreateTaskInput): Promise<Task> {
+    const res = await client.post<{ success: true; data: Task }>('/tasks', data);
+    return res.data.data;
 }
 
-export function getTask(token: string, id: string): Promise<Task> {
-    return authFetch<Task>('GET', `/tasks/${id}`, token);
+export async function getTask(id: string): Promise<Task> {
+    const res = await client.get<{ success: true; data: Task }>(`/tasks/${id}`);
+    return res.data.data;
 }
 
 /** PUT /api/tasks/:id/status — FSM-guarded; only forward transitions accepted. */
-export function updateTaskStatus(token: string, id: string, status: TaskStatus): Promise<Task> {
-    return authFetch<Task>('PUT', `/tasks/${id}/status`, token, { status });
+export async function updateTaskStatus(id: string, status: TaskStatus): Promise<Task> {
+    const res = await client.put<{ success: true; data: Task }>(`/tasks/${id}/status`, { status });
+    return res.data.data;
 }

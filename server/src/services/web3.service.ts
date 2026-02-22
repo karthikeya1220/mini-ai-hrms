@@ -20,6 +20,13 @@
 //   Accepts any 0x-prefixed 64-hex-char string (Ethereum tx hash format, 66
 //   chars total). The value is stored verbatim — we do not re-verify on-chain
 //   because the contract call is the caller's responsibility.
+//
+// RBAC additions:
+//   logBlockchainEntry — accepts optional requestingEmployeeId; when present
+//     (EMPLOYEE role) enforces that task.assignedTo === requestingEmployeeId.
+//   listBlockchainLogs — accepts optional employeeId filter; when present
+//     (EMPLOYEE role) joins through tasks to return only logs for tasks
+//     assigned to that employee.
 // =============================================================================
 
 import prisma from '../lib/prisma';
@@ -39,12 +46,13 @@ export interface BlockchainLogResponse {
 // ─── Input ────────────────────────────────────────────────────────────────────
 
 export interface LogTaskInput {
-    orgId: string;   // from JWT — never from request body
-    taskId: string;   // UUID
-    txHash: string;   // 0x + 64 hex chars
+    orgId: string;                    // from JWT — never from request body
+    taskId: string;                   // UUID
+    txHash: string;                   // 0x + 64 hex chars
+    requestingEmployeeId?: string;    // set when caller is EMPLOYEE — used for ownership check
 }
 
-// ─── Service function ─────────────────────────────────────────────────────────
+// ─── Service function: logBlockchainEntry ─────────────────────────────────────
 
 /**
  * Record an on-chain task-completion event in blockchain_logs.
@@ -52,9 +60,12 @@ export interface LogTaskInput {
  * Steps (all in the same DB connection, no transaction needed):
  *   1. Verify the task exists and belongs to this org.
  *      Uses findFirst({ where: { id, orgId } }) — atomic ownership check.
- *   2. Guard against duplicate logging.
+ *   2. EMPLOYEE ownership guard (when requestingEmployeeId is provided):
+ *      task.assignedTo must equal requestingEmployeeId — an employee may only
+ *      log blockchain entries for tasks assigned to them.
+ *   3. Guard against duplicate logging.
  *      A second POST for the same taskId returns 409 ALREADY_LOGGED.
- *   3. Insert the blockchain_log row.
+ *   4. Insert the blockchain_log row.
  *
  * Why no Prisma transaction?
  *   The three operations are read-then-write. The insertion itself is
@@ -67,15 +78,15 @@ export interface LogTaskInput {
 export async function logBlockchainEntry(
     input: LogTaskInput,
 ): Promise<BlockchainLogResponse> {
-    const { orgId, taskId, txHash } = input;
+    const { orgId, taskId, txHash, requestingEmployeeId } = input;
 
-    // ── 1. Task ownership check ───────────────────────────────────────────────
+    // ── 1. Task existence + org guard ─────────────────────────────────────────
     // findFirst with { id, orgId } — same compound-where pattern used everywhere
     // in the codebase. Returns null for both "not found" and "wrong org" —
     // 404 in both cases to prevent cross-tenant ID enumeration.
     const task = await prisma.task.findFirst({
         where: { id: taskId, orgId },
-        select: { id: true },
+        select: { id: true, assignedTo: true },
     });
 
     if (!task) {
@@ -86,7 +97,20 @@ export async function logBlockchainEntry(
         );
     }
 
-    // ── 2. Duplicate check ────────────────────────────────────────────────────
+    // ── 2. EMPLOYEE ownership guard ───────────────────────────────────────────
+    // Only enforced when the caller is an EMPLOYEE (requestingEmployeeId set).
+    // ADMINs may log any task in the org — requestingEmployeeId is undefined.
+    if (requestingEmployeeId !== undefined) {
+        if (task.assignedTo !== requestingEmployeeId) {
+            throw new AppError(
+                403,
+                'FORBIDDEN',
+                'You can only log blockchain entries for tasks assigned to you.',
+            );
+        }
+    }
+
+    // ── 3. Duplicate check ────────────────────────────────────────────────────
     // A task may only appear once in blockchain_logs.
     // We scope by orgId as well so the check cannot be confused across tenants.
     const existing = await prisma.blockchainLog.findFirst({
@@ -102,7 +126,7 @@ export async function logBlockchainEntry(
         );
     }
 
-    // ── 3. Insert ─────────────────────────────────────────────────────────────
+    // ── 4. Insert ─────────────────────────────────────────────────────────────
     const log = await prisma.blockchainLog.create({
         data: {
             orgId,
@@ -121,4 +145,55 @@ export async function logBlockchainEntry(
     });
 
     return log;
+}
+
+// ─── Input: listBlockchainLogs ────────────────────────────────────────────────
+
+export interface ListBlockchainLogsInput {
+    orgId: string;          // always required — tenant boundary
+    employeeId?: string;    // when set, scopes to tasks assigned to this employee
+}
+
+// ─── Service function: listBlockchainLogs ─────────────────────────────────────
+
+/**
+ * Retrieve blockchain_logs for this org, ordered most-recent first.
+ *
+ * ADMIN: returns all logs in the org (employeeId omitted).
+ * EMPLOYEE: returns only logs for tasks assigned to them (employeeId set).
+ *
+ * The EMPLOYEE filter works by joining through the tasks table:
+ *   WHERE blockchain_logs.org_id = $orgId
+ *   AND   tasks.assigned_to      = $employeeId
+ *
+ * Prisma expresses this as a nested `task: { assignedTo: employeeId }` filter
+ * on the relation — the query planner uses idx_tasks_assigned.
+ *
+ * orgId is always applied first — an employee cannot access another org's logs
+ * even if they somehow supply a valid foreign employeeId.
+ */
+export async function listBlockchainLogs(
+    input: ListBlockchainLogsInput,
+): Promise<BlockchainLogResponse[]> {
+    const { orgId, employeeId } = input;
+
+    const logs = await prisma.blockchainLog.findMany({
+        where: {
+            orgId,                                              // tenant boundary — always first
+            ...(employeeId && {
+                task: { assignedTo: employeeId },              // join through tasks.assigned_to
+            }),
+        },
+        select: {
+            id: true,
+            orgId: true,
+            taskId: true,
+            txHash: true,
+            eventType: true,
+            loggedAt: true,
+        },
+        orderBy: { loggedAt: 'desc' },
+    });
+
+    return logs;
 }

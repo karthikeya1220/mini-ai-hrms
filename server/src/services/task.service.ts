@@ -185,6 +185,99 @@ export async function getTaskById(
     return task as unknown as TaskRow;
 }
 
+// ─── DELETE (hard delete, admin only) ────────────────────────────────────────
+
+/**
+ * Hard-delete a task by ID, scoped to orgId.
+ *
+ * Guards:
+ *   1. Task must exist in this org — getTaskById throws 404 if not found.
+ *
+ * Note: Hard delete is intentional for tasks (unlike employees, which use
+ * soft-delete / isActive).  Tasks that are completed may have blockchain logs
+ * and performance logs attached — callers should only delete tasks that are
+ * no longer referenced by audit records in production use.
+ */
+export async function deleteTask(
+    orgId: string,
+    taskId: string,
+): Promise<void> {
+    // Org guard — throws 404 TASK_NOT_FOUND if id+orgId don't match.
+    await getTaskById(orgId, taskId);
+
+    await prisma.task.delete({ where: { id: taskId } });
+
+    // Invalidate dashboard cache — deletion changes org-level task counts.
+    void invalidateDashboardCache(orgId);
+}
+
+// ─── UPDATE (full, admin only) ────────────────────────────────────────────────
+
+export interface UpdateTaskInput {
+    title?: string;
+    description?: string;
+    priority?: TaskPriority;
+    complexityScore?: number;
+    requiredSkills?: string[];
+    assignedTo?: string | null;  // null = unassign
+    dueDate?: string | null;     // null = clear due date
+}
+
+/**
+ * Full update of mutable task fields — admin only.
+ *
+ * Guards:
+ *   1. Task must exist in this org (orgId cross-tenant guard).
+ *   2. If assignedTo is provided (and not null), employee must be active
+ *      and belong to the same org — same guard as createTask.
+ *
+ * Does NOT modify status or completedAt — those are FSM-guarded by
+ * updateTaskStatus().
+ */
+export async function updateTask(
+    orgId: string,
+    taskId: string,
+    input: UpdateTaskInput,
+): Promise<TaskRow> {
+    // ── 1. Existence + org guard ─────────────────────────────────────────────
+    await getTaskById(orgId, taskId); // throws 404 if not found or wrong org
+
+    // ── 2. Validate new assignedTo belongs to this org ───────────────────────
+    if (input.assignedTo != null) {
+        const employee = await prisma.employee.findFirst({
+            where: { id: input.assignedTo, orgId, isActive: true },
+            select: { id: true },
+        });
+        if (!employee) {
+            throw new AppError(
+                404,
+                'EMPLOYEE_NOT_FOUND',
+                'Assigned employee not found or is inactive in this organisation',
+            );
+        }
+    }
+
+    const updated = await prisma.task.update({
+        where: { id: taskId },   // safe: org verified in step 1
+        data: {
+            ...(input.title !== undefined      && { title: input.title }),
+            ...(input.description !== undefined && { description: input.description }),
+            ...(input.priority !== undefined    && { priority: input.priority }),
+            ...(input.complexityScore !== undefined && { complexityScore: input.complexityScore }),
+            ...(input.requiredSkills !== undefined  && { requiredSkills: input.requiredSkills }),
+            // assignedTo: null unassigns; omitted field → no change
+            ...('assignedTo' in input && { assignedTo: input.assignedTo ?? null }),
+            // dueDate: null clears; omitted field → no change
+            ...('dueDate' in input && {
+                dueDate: input.dueDate ? new Date(input.dueDate) : null,
+            }),
+        },
+        select: TASK_SELECT,
+    }) as unknown as TaskRow;
+
+    return updated;
+}
+
 // ─── UPDATE STATUS ────────────────────────────────────────────────────────────
 
 export interface UpdateTaskStatusInput {

@@ -6,12 +6,25 @@
 //   GET /api/ai/recommend/:taskId      — top-3 employee recommendations for task
 //   GET /api/ai/skill-gap/:employeeId  — skill gap analysis
 //
-// All routes require JWT — authMiddleware applied at router.use() level.
-// This means any future AI endpoint added here is automatically protected.
+// RBAC:
+//   ┌──────────────────────────────┬────────────────────────────────────────────┐
+//   │ Route                        │ Gate                                       │
+//   ├──────────────────────────────┼────────────────────────────────────────────┤
+//   │ GET /score/:employeeId       │ ADMIN OR req.user.employeeId === :employeeId│
+//   │ GET /recommend/:taskId       │ ADMIN only                                 │
+//   │ GET /skill-gap/:employeeId   │ ADMIN OR req.user.employeeId === :employeeId│
+//   └──────────────────────────────┴────────────────────────────────────────────┘
+//
+// authorizeOwnerOrAdmin('employeeId') is passed 'employeeId' (not the default
+// 'id') because these routes use :employeeId as the param name.
+//
+// Org scoping: all three service functions receive orgId from req.user.orgId
+// and apply it as a WHERE clause before returning any data — a valid
+// :employeeId from another org returns 404, not that org's data.
 // =============================================================================
 
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, authorize, authorizeOwnerOrAdmin } from '../middleware/auth';
 import {
     getScoreHandler,
     recommendHandler,
@@ -20,22 +33,28 @@ import {
 
 const router = Router();
 
-// Enforce JWT on every route in this file.
-router.use(authMiddleware);
+// ── GET /api/ai/score/:employeeId ─────────────────────────────────────────────
+// ADMIN sees any employee's score; EMPLOYEE sees only their own.
+router.get('/score/:employeeId',
+    authMiddleware,
+    authorizeOwnerOrAdmin('employeeId'),
+    getScoreHandler,
+);
 
-// ── Score ──────────────────────────────────────────────────────────────────
-// GET /api/ai/score/:employeeId
-// Returns: score (0-100), grade (A+/A/B/C/D), breakdown, trend, computedAt
-router.get('/score/:employeeId', getScoreHandler);
+// ── GET /api/ai/recommend/:taskId ─────────────────────────────────────────────
+// Admin only — recommendation data includes all active employees + their scores.
+router.get('/recommend/:taskId',
+    authMiddleware,
+    authorize(['ADMIN']),
+    recommendHandler,
+);
 
-// ── Recommend ──────────────────────────────────────────────────────────────
-// GET /api/ai/recommend/:taskId
-// Returns: ranked top-3 employees with skillOverlap, activeCount, perfScore
-router.get('/recommend/:taskId', recommendHandler);
-
-// ── Skill Gap ──────────────────────────────────────────────────────────────
-// GET /api/ai/skill-gap/:employeeId
-// Returns: currentSkills, requiredSkills, gapSkills, coverageRate
-router.get('/skill-gap/:employeeId', skillGapHandler);
+// ── GET /api/ai/skill-gap/:employeeId ────────────────────────────────────────
+// ADMIN sees any employee's gaps; EMPLOYEE sees only their own.
+router.get('/skill-gap/:employeeId',
+    authMiddleware,
+    authorizeOwnerOrAdmin('employeeId'),
+    skillGapHandler,
+);
 
 export default router;

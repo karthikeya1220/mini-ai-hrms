@@ -2,27 +2,30 @@
 // Task controller — HTTP layer for /api/tasks/* routes.
 //
 // Responsibility boundary:
-//   - Extract orgId from req.org.id (JWT-derived, never req.body)
+//   - Extract orgId from req.user.orgId (JWT-derived, never req.body)
 //   - Validate body / query params with Zod
 //   - Call task service
 //   - Strip orgId from response via toResponse()
 //   - Forward errors to global errorHandler via next(err)
 //
 // Routes handled:
-//   GET  /api/tasks           → listTasksHandler
-//   POST /api/tasks           → createTaskHandler
-//   GET  /api/tasks/:id       → getTaskHandler
-//   PUT  /api/tasks/:id/status → updateStatusHandler
+//   GET    /api/tasks             → listTasksHandler       (admin: all; employee: own)
+//   POST   /api/tasks             → createTaskHandler      (admin only)
+//   GET    /api/tasks/:id         → getTaskHandler         (all authenticated)
+//   PUT    /api/tasks/:id         → updateTaskHandler      (admin only)
+//   PUT    /api/tasks/:id/status  → updateStatusHandler    (admin OR assigned employee)
 // =============================================================================
 
 import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AuthRequest } from '../types';
-import { sendSuccess } from '../utils/response';
+import { sendSuccess, sendError } from '../utils/response';
 import {
     createTask,
     listTasks,
     getTaskById,
+    updateTask,
+    deleteTask,
     updateTaskStatus,
     toResponse,
 } from '../services/task.service';
@@ -40,6 +43,18 @@ const CreateTaskSchema = z.object({
     requiredSkills: z.array(z.string().min(1)).default([]),
     assignedTo: z.string().uuid('assignedTo must be a valid employee UUID').optional(),
     dueDate: z.string().datetime({ message: 'dueDate must be an ISO 8601 datetime' }).optional(),
+    // orgId intentionally absent — NEVER accepted from client
+});
+
+const UpdateTaskSchema = z.object({
+    title: z.string().min(1).max(255).optional(),
+    description: z.string().max(5000).optional(),
+    priority: PriorityEnum.optional(),
+    complexityScore: z.number().int().min(1).max(5).optional(),
+    requiredSkills: z.array(z.string().min(1)).optional(),
+    assignedTo: z.string().uuid('assignedTo must be a valid employee UUID').nullable().optional(),
+    dueDate: z.string().datetime({ message: 'dueDate must be an ISO 8601 datetime' }).nullable().optional(),
+    // status intentionally absent — status transitions go through PUT /:id/status
     // orgId intentionally absent — NEVER accepted from client
 });
 
@@ -63,6 +78,7 @@ function requireOrgId(req: AuthRequest): string {
 }
 
 // ─── POST /api/tasks ──────────────────────────────────────────────────────────
+// Admin only — role gate enforced in routes/tasks.ts.
 
 export async function createTaskHandler(
     req: AuthRequest,
@@ -81,6 +97,9 @@ export async function createTaskHandler(
 }
 
 // ─── GET /api/tasks ───────────────────────────────────────────────────────────
+// ADMIN → all tasks in org, honours all query filters.
+// EMPLOYEE → only tasks assigned to their employee profile; assignedTo filter
+//            is forced to their employeeId and cannot be overridden by query params.
 
 export async function listTasksHandler(
     req: AuthRequest,
@@ -88,53 +107,31 @@ export async function listTasksHandler(
     next: NextFunction,
 ): Promise<void> {
     try {
-        const orgId = requireOrgId(req);
-        const query = ListQuerySchema.parse(req.query);
+        const orgId  = requireOrgId(req);
+        const user   = req.user!;
+        const query  = ListQuerySchema.parse(req.query);
+
+        // EMPLOYEE: scope to their own tasks unconditionally.
+        // The client-supplied assignedTo param is silently ignored — an employee
+        // must not be able to list another employee's tasks by passing their UUID.
+        const assignedTo =
+            user.role === 'EMPLOYEE'
+                ? (user.employeeId ?? undefined)  // null employeeId → no results (no filter match)
+                : query.assignedTo;               // ADMIN: honour the query param as-is
 
         const result = await listTasks({
             orgId,
-            status: query.status,
-            assignedTo: query.assignedTo,
-            priority: query.priority,
-            limit: query.limit,
-            cursor: query.cursor,
+            status:      query.status,
+            assignedTo,
+            priority:    query.priority,
+            limit:       query.limit,
+            cursor:      query.cursor,
         });
 
         sendSuccess(res, {
-            data: result.data.map(toResponse),
+            data:       result.data.map(toResponse),
             nextCursor: result.nextCursor,
-            total: result.total,
-        });
-    } catch (err) {
-        next(err);
-    }
-}
-
-// ─── GET /api/tasks/my ────────────────────────────────────────────────────────
-
-export async function listMyTasksHandler(
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction,
-): Promise<void> {
-    try {
-        const orgId = requireOrgId(req);
-        const userId = req.user!.id;
-        const query = ListQuerySchema.parse(req.query);
-
-        const result = await listTasks({
-            orgId,
-            status: query.status,
-            assignedTo: userId, // Force assignedTo to current user ID
-            priority: query.priority,
-            limit: query.limit,
-            cursor: query.cursor,
-        });
-
-        sendSuccess(res, {
-            data: result.data.map(toResponse),
-            nextCursor: result.nextCursor,
-            total: result.total,
+            total:      result.total,
         });
     } catch (err) {
         next(err);
@@ -142,6 +139,7 @@ export async function listMyTasksHandler(
 }
 
 // ─── GET /api/tasks/:id ───────────────────────────────────────────────────────
+// All authenticated users — orgId scoping is applied inside getTaskById.
 
 export async function getTaskHandler(
     req: AuthRequest,
@@ -149,7 +147,7 @@ export async function getTaskHandler(
     next: NextFunction,
 ): Promise<void> {
     try {
-        const orgId = requireOrgId(req);
+        const orgId  = requireOrgId(req);
         const taskId = req.params.id;
 
         const task = await getTaskById(orgId, taskId);
@@ -159,7 +157,35 @@ export async function getTaskHandler(
     }
 }
 
+// ─── PUT /api/tasks/:id ───────────────────────────────────────────────────────
+// Admin only — full update of mutable fields.
+// Status is NOT updated here; use PUT /:id/status for FSM-guarded transitions.
+
+export async function updateTaskHandler(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const orgId  = requireOrgId(req);
+        const taskId = req.params.id;
+        const input  = UpdateTaskSchema.parse(req.body);
+
+        const task = await updateTask(orgId, taskId, input);
+        sendSuccess(res, toResponse(task));
+    } catch (err) {
+        next(err);
+    }
+}
+
 // ─── PUT /api/tasks/:id/status ────────────────────────────────────────────────
+// ADMIN: may transition any task in the org.
+// EMPLOYEE: may only transition a task assigned to them.
+//
+// Ownership is enforced here — not in middleware — because the task's
+// assignedTo field is in the DB, not in req.params.  The middleware layer
+// cannot perform this check without a DB call; the service already fetches
+// the task row, so we reuse that fetch via getTaskById before delegating.
 
 export async function updateStatusHandler(
     req: AuthRequest,
@@ -167,21 +193,53 @@ export async function updateStatusHandler(
     next: NextFunction,
 ): Promise<void> {
     try {
-        const orgId = requireOrgId(req);
+        const orgId  = requireOrgId(req);
         const taskId = req.params.id;
-        const input = UpdateStatusSchema.parse(req.body);
+        const user   = req.user!;
+        const input  = UpdateStatusSchema.parse(req.body);
 
-        // updateTaskStatus returns a typed result — the controller does NOT need to
-        // re-inspect task.status or task.assignedTo to know whether scoring was dispatched.
-        // That decision belongs in the service; the controller just reads the flag.
+        // EMPLOYEE ownership check — must happen before updateTaskStatus so we
+        // can reject without performing the FSM transition.
+        if (user.role === 'EMPLOYEE') {
+            const task = await getTaskById(orgId, taskId);
+
+            // employeeId null → no linked profile → can never own a task.
+            if (!user.employeeId || task.assignedTo !== user.employeeId) {
+                sendError(
+                    res,
+                    403,
+                    'FORBIDDEN',
+                    'You can only update the status of tasks assigned to you.',
+                );
+                return;
+            }
+        }
+
         const { task, scoringDispatched } = await updateTaskStatus(orgId, taskId, input);
 
         sendSuccess(res, {
             ...toResponse(task),
-            // _meta is informational — not part of the core data contract.
-            // scoringQueued = true means a background job was QUEUED, not completed.
             ...(scoringDispatched && { _meta: { scoringQueued: true } }),
         });
+    } catch (err) {
+        next(err);
+    }
+}
+
+// ─── DELETE /api/tasks/:id ────────────────────────────────────────────────────
+// Admin only — hard delete. Role gate enforced in routes/tasks.ts.
+
+export async function deleteTaskHandler(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const orgId  = requireOrgId(req);
+        const taskId = req.params.id;
+
+        await deleteTask(orgId, taskId);
+        sendSuccess(res, { id: taskId }, 200);
     } catch (err) {
         next(err);
     }

@@ -78,17 +78,15 @@ function SkeletonCard() {
 const COLUMNS: TaskStatus[] = ['assigned', 'in_progress', 'completed'];
 
 export default function TaskBoardPage() {
-    const { user, org, accessToken, logout } = useAuth();
+    const { user, org, isAdmin, logout } = useAuth();
     const { logTaskCompletion, account } = useWeb3Context();
-
-    const isAdmin = user?.role === 'ADMIN';
 
     // ── Task data ──────────────────────────────────────────────────────────────
     const { tasks, total, loading, error, refetch, addTask, moveTask } =
-        useTasks(accessToken, { limit: 100 }, !isAdmin);
+        useTasks({ limit: 100 }, !isAdmin);
 
     // ── Employees (for assignee names + modal dropdown) ────────────────────────
-    const { employees } = useEmployees(accessToken, { isActive: 'true', limit: 100 });
+    const { employees } = useEmployees({ isActive: 'true', limit: 100 });
 
     const employeeMap = new Map(employees.map(e => [e.id, e]));
 
@@ -155,7 +153,7 @@ export default function TaskBoardPage() {
                     }
 
                     // 3. Record the tx_hash in our backend off-chain DB
-                    const logged = await postWeb3Log(accessToken ?? '', {
+                    const logged = await postWeb3Log({
                         taskId:    id,
                         txHash,
                         eventType: 'task_completed',
@@ -172,7 +170,7 @@ export default function TaskBoardPage() {
         } finally {
             setMovingIds(s => { const n = new Set(s); n.delete(id); return n; });
         }
-    }, [tasks, moveTask, logTaskCompletion, account, accessToken]);
+    }, [tasks, moveTask, logTaskCompletion, account]);
 
     // ── DnD handlers ──────────────────────────────────────────────────────────
     function handleDragOver(e: React.DragEvent, targetStatus: TaskStatus) {

@@ -72,11 +72,10 @@ function BreakdownBar({ label, value, max = 1 }: { label: string; value: number;
 
 interface Props {
     employee: Employee;
-    token: string;
     onClose: () => void;
 }
 
-export function ScorePanel({ employee, token, onClose }: Props) {
+export function ScorePanel({ employee, onClose }: Props) {
     type ScoreState =
         | { status: 'loading' }
         | { status: 'ok'; data: ProductivityScore }
@@ -90,11 +89,11 @@ export function ScorePanel({ employee, token, onClose }: Props) {
         const t = setTimeout(() => {
             if (!cancelled) setState({ status: 'loading' });
         }, 0);
-        getEmployeeScore(token, employee.id)
+        getEmployeeScore(employee.id)
             .then(d => { if (!cancelled) { clearTimeout(t); setState({ status: 'ok', data: d }); } })
             .catch(e => { if (!cancelled) { clearTimeout(t); setState({ status: 'error', message: e.message ?? 'Failed to load score' }); } });
         return () => { cancelled = true; clearTimeout(t); };
-    }, [token, employee.id]);
+    }, [employee.id]);
 
     const loading = state.status === 'loading';
     const error = state.status === 'error' ? state.message : '';

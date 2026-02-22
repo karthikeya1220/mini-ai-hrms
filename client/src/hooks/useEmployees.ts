@@ -22,7 +22,6 @@ interface UseEmployeesResult {
 }
 
 export function useEmployees(
-    token: string | null,
     params: ListParams = {},
 ): UseEmployeesResult {
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -34,12 +33,11 @@ export function useEmployees(
     const paramsKey = JSON.stringify(params);
 
     useEffect(() => {
-        if (!token) return;
         let cancelled = false;
         setLoading(true);
         setError(null);
 
-        listEmployees(token, params)
+        listEmployees(params)
             .then(r => {
                 if (!cancelled) {
                     setEmployees(r.data);
@@ -53,32 +51,29 @@ export function useEmployees(
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, tick, paramsKey]);
+    }, [tick, paramsKey]);
 
     const refetch = useCallback(() => setTick(t => t + 1), []);
 
     const addEmployee = useCallback(async (data: EmployeeInput): Promise<Employee> => {
-        if (!token) throw new Error('Not authenticated');
-        const emp = await createEmployee(token, data);
+        const emp = await createEmployee(data);
         setEmployees(prev => [emp, ...prev]);
         setTotal(t => t + 1);
         return emp;
-    }, [token]);
+    }, []);
 
     const editEmployee = useCallback(async (id: string, data: Partial<EmployeeInput>): Promise<Employee> => {
-        if (!token) throw new Error('Not authenticated');
-        const emp = await updateEmployee(token, id, data);
+        const emp = await updateEmployee(id, data);
         setEmployees(prev => prev.map(e => e.id === id ? emp : e));
         return emp;
-    }, [token]);
+    }, []);
 
     const removeEmployee = useCallback(async (id: string): Promise<Employee> => {
-        if (!token) throw new Error('Not authenticated');
-        const emp = await deactivateEmployee(token, id);
+        const emp = await deactivateEmployee(id);
         // Optimistic: keep in list but mark inactive (matching server soft-delete)
         setEmployees(prev => prev.map(e => e.id === id ? emp : e));
         return emp;
-    }, [token]);
+    }, []);
 
     return { employees, total, loading, error, refetch, addEmployee, editEmployee, removeEmployee };
 }

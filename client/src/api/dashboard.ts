@@ -1,8 +1,9 @@
 // api/dashboard.ts — typed wrapper for GET /api/dashboard.
 //
-// Response mirrors DashboardStats from services/dashboard.service.ts exactly.
+// All calls use the shared Axios client (api/client.ts).
+// Authorization header and TOKEN_EXPIRED refresh are handled automatically.
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
+import { client } from './client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,20 +42,7 @@ export interface DashboardData {
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
-export async function fetchDashboard(accessToken: string): Promise<DashboardData> {
-    const res = await fetch(`${API_BASE}/dashboard`, {
-        credentials: 'include',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error((json as { message?: string }).message ?? `Dashboard fetch failed (${res.status})`);
-    }
-
-    const json = await res.json() as { success: true; data: DashboardData };
-    return json.data;
+export async function fetchDashboard(): Promise<DashboardData> {
+    const res = await client.get<{ success: true; data: DashboardData }>('/dashboard');
+    return res.data.data;
 }

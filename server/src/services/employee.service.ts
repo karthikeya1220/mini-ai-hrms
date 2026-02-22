@@ -23,6 +23,14 @@ import { AppError } from '../middleware/errorHandler';
 import { hashPassword } from '../utils/hash';
 import { EmployeeRow, EmployeeResponse, PaginatedResponse, UserRole } from '../types';
 
+// ─── Crypto — temporary password generation ───────────────────────────────────
+import { randomBytes } from 'crypto';
+
+/** Generate a cryptographically random temporary password (16 url-safe chars). */
+function generateTempPassword(): string {
+    return randomBytes(12).toString('base64url'); // 16-char url-safe string
+}
+
 // ─── select clause ────────────────────────────────────────────────────────────
 // Centralised here so every query returns identical fields.
 // orgId is selected internally but stripped before the response leaves the
@@ -73,7 +81,6 @@ export function toResponse(row: EmployeeRow): EmployeeResponse {
 export interface CreateEmployeeInput {
     name: string;
     email: string;
-    password?: string; // Optional: can be set by Admin
     role?: UserRole;
     department?: string;
     skills?: string[];
@@ -81,32 +88,97 @@ export interface CreateEmployeeInput {
 }
 
 /**
- * Create a new employee scoped to orgId.
+ * Return shape for createEmployee — includes the employee record and the newly
+ * created user account (passwordHash is always omitted before leaving the service).
+ */
+export interface CreateEmployeeResult {
+    employee: EmployeeRow;
+    user: {
+        id: string;
+        email: string;
+        role: 'ADMIN' | 'EMPLOYEE';
+        employeeId: string;
+        createdAt: Date;
+    };
+    /** Plain-text temporary password — return to the admin once; never stored again. */
+    temporaryPassword: string;
+}
+
+/**
+ * Create a new employee + a corresponding User auth account inside a single
+ * Prisma transaction.
+ *
+ * Flow:
+ *   1. Generate a cryptographically random temporary password.
+ *   2. Hash it with bcrypt (12 rounds).
+ *   3. $transaction([
+ *        a. prisma.employee.create  — inserts the Employee profile row.
+ *        b. prisma.user.create      — inserts the User auth row, linking
+ *                                     employeeId → the new employee's id.
+ *      ])
+ *   4. Return { employee, user (no passwordHash), temporaryPassword }.
+ *
+ * The admin receives temporaryPassword once in the API response so they can
+ * communicate it to the new employee out-of-band.  It is never stored in
+ * plain text and is not retrievable after this call.
+ *
  * orgId is ONLY taken from the verified JWT — never from the input object.
  */
 export async function createEmployee(
     orgId: string,
     input: CreateEmployeeInput,
-): Promise<EmployeeRow> {
-    const passwordHash = await hashPassword(input.password || 'Temporary123!');
+): Promise<CreateEmployeeResult> {
+    // 1. Generate + hash temporary password before opening the transaction
+    //    so that the async bcrypt work does not hold the transaction open.
+    const temporaryPassword = generateTempPassword();
+    const passwordHash = await hashPassword(temporaryPassword);
 
+    // Use an interactive transaction so we can reference the employee.id when
+    // creating the User row in the same atomic operation.
     try {
-        const employee = await (prisma.employee as any).create({
-            data: {
-                orgId,                                 // ← from JWT, never from input
-                name: input.name,
-                email: input.email,
-                passwordHash,
-                role: input.role || 'EMPLOYEE',
-                department: input.department ?? null,
-                skills: input.skills ?? [],
-                walletAddress: input.walletAddress ?? null,
-            },
-            select: EMPLOYEE_SELECT,
+        const result = await prisma.$transaction(async (tx) => {
+            // Step A — Employee profile
+            const employee = await (tx.employee as any).create({
+                data: {
+                    orgId,
+                    name:          input.name,
+                    email:         input.email,
+                    passwordHash,
+                    role:          input.role ?? 'EMPLOYEE',
+                    department:    input.department  ?? null,
+                    skills:        input.skills      ?? [],
+                    walletAddress: input.walletAddress ?? null,
+                },
+                select: EMPLOYEE_SELECT,
+            });
+
+            // Step B — User auth account linked to the employee
+            const user = await (tx as any).user.create({
+                data: {
+                    orgId,
+                    employeeId:   employee.id,   // FK → employees(id)
+                    email:        input.email,
+                    passwordHash,
+                    role:         'EMPLOYEE',    // always EMPLOYEE for created staff
+                    tokenVersion: 0,
+                    isActive:     true,
+                },
+                select: {
+                    id:         true,
+                    email:      true,
+                    role:       true,
+                    employeeId: true,
+                    createdAt:  true,
+                    // passwordHash intentionally excluded
+                },
+            });
+
+            return { employee: mapRow(employee), user };
         });
-        return mapRow(employee);
+
+        return { ...result, temporaryPassword };
     } catch (err: unknown) {
-        // UNIQUE(org_id, email) violation
+        // UNIQUE(org_id, email) on Employee  OR  UNIQUE(email) on User
         if (isPrismaUniqueError(err)) {
             throw new AppError(
                 409,

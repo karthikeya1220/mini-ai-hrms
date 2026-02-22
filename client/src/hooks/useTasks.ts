@@ -15,7 +15,6 @@ interface UseTasksResult {
 }
 
 export function useTasks(
-    token: string | null,
     params: ListTaskParams = {},
     isMy: boolean = false
 ): UseTasksResult {
@@ -27,37 +26,34 @@ export function useTasks(
     const paramsKey = JSON.stringify(params);
 
     useEffect(() => {
-        if (!token) return;
         let cancelled = false;
         setLoading(true);
         setError(null);
 
         const fetcher = isMy ? listMyTasks : listTasks;
 
-        fetcher(token, { limit: 100, ...params })
+        fetcher({ limit: 100, ...params })
             .then(r => { if (!cancelled) { setTasks(r.data); setTotal(r.total); setLoading(false); } })
             .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, tick, paramsKey, isMy]);
+    }, [tick, paramsKey, isMy]);
 
     const refetch = useCallback(() => setTick(t => t + 1), []);
 
     const addTask = useCallback(async (data: CreateTaskInput): Promise<Task> => {
-        if (!token) throw new Error('Not authenticated');
-        const task = await createTask(token, data);
+        const task = await createTask(data);
         setTasks(prev => [task, ...prev]);
         setTotal(t => t + 1);
         return task;
-    }, [token]);
+    }, []);
 
     /** Optimistically moves the card then syncs with server */
     const moveTask = useCallback(async (id: string, newStatus: TaskStatus): Promise<Task> => {
-        if (!token) throw new Error('Not authenticated');
         // 1. Optimistic update — card snaps to new column immediately
         setTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
         try {
-            const updated = await updateTaskStatus(token, id, newStatus);
+            const updated = await updateTaskStatus(id, newStatus);
             // 2. Sync server response (in case completedAt was stamped, etc.)
             setTasks(prev => prev.map(t => t.id === id ? updated : t));
             return updated;
@@ -70,7 +66,7 @@ export function useTasks(
             refetch();
             throw err;
         }
-    }, [token, refetch]);
+    }, [refetch]);
 
     return { tasks, total, loading, error, refetch, addTask, moveTask };
 }

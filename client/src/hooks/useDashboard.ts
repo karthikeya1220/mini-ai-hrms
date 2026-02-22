@@ -12,27 +12,27 @@ interface UseDashboardResult {
     refetch: () => void;
 }
 
-export function useDashboard(accessToken: string | null): UseDashboardResult {
+export function useDashboard(): UseDashboardResult {
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [tick, setTick] = useState(0);
 
     useEffect(() => {
-        if (!accessToken) return;
-
         let cancelled = false;
-        setLoading(true);
-        setError(null);
 
-        fetchDashboard(accessToken)
+        fetchDashboard()
             .then(d => { if (!cancelled) { setData(d); setLoading(false); } })
             .catch(e => { if (!cancelled) { setError(String(e.message)); setLoading(false); } });
 
         return () => { cancelled = true; };
-    }, [accessToken, tick]);
+    }, [tick]);
 
-    const refetch = useCallback(() => setTick(t => t + 1), []);
+    const refetch = useCallback(() => {
+        setLoading(true);
+        setError(null);
+        setTick(t => t + 1);
+    }, []);
 
     return { data, loading, error, refetch };
 }

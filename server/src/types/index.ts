@@ -6,13 +6,15 @@
 import { Request } from 'express';
 
 // ─── Authenticated User ────────────────────────────────────────────────────
-// After authMiddleware runs, every request carries this on req.user.
-// The orgId and userId are extracted from the JWT.
+// Populated by authMiddleware on every authenticated request.
+// Every field is sourced from the verified JWT payload — never from the
+// request body.  orgId is the tenant-scoping anchor for all DB queries.
 export type UserRole = 'ADMIN' | 'EMPLOYEE';
 
 export interface AuthenticatedUser {
-    id: string;      // User ID (Employee ID)
-    orgId: string;   // Organization ID
+    id: string;                  // users.id (User UUID — NOT Employee UUID)
+    orgId: string;               // users.org_id — sole source of tenant scoping
+    employeeId: string | null;   // users.employee_id — null until Employee profile linked
     email: string;
     role: UserRole;
 }

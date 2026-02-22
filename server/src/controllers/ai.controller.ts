@@ -7,7 +7,7 @@
 //   GET /api/ai/skill-gap/:employeeId → skillGapHandler
 //
 // Responsibility boundary (same as all controllers):
-//   - Extract orgId from req.org.id  (JWT-derived, NEVER from req.body/params)
+//   - Extract orgId from req.user.orgId (JWT-derived, NEVER from req.body/params)
 //   - Validate path params with Zod  (UUID format guard)
 //   - Call the AI service
 //   - Format response per SPEC § 2.4 Score Response shape
