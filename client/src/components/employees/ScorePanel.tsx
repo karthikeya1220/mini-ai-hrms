@@ -142,46 +142,53 @@ export function ScorePanel({ employee, onClose }: Props) {
                         </div>
                     ) : data ? (
                         <>
+                            {data.score === null ? (
+                                <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6 text-center text-sm text-slate-500">
+                                    No completed tasks yet — score will appear once a task is completed.
+                                </div>
+                            ) : (
+                            <>
                             {/* Score ring */}
                             <div className="flex justify-center">
-                                <ScoreRing score={data.score} grade={data.grade} />
+                                <ScoreRing score={data.score} grade={data.grade ?? '—'} />
                             </div>
 
                             {/* Trend */}
                             <div className="flex items-center justify-center gap-2">
-                                <span className={`text-sm font-semibold ${data.trend >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                    {data.trend >= 0 ? '↑' : '↓'} {Math.abs(data.trend).toFixed(1)} pts
+                                <span className={`text-sm font-semibold ${data.trend === 'improving' ? 'text-emerald-400' : data.trend === 'declining' ? 'text-red-400' : 'text-slate-400'}`}>
+                                    {data.trend === 'improving' ? '↑ Improving' : data.trend === 'declining' ? '↓ Declining' : data.trend === 'stable' ? '→ Stable' : '— Insufficient data'}
                                 </span>
-                                <span className="text-xs text-slate-600">vs previous period</span>
                             </div>
 
                             {/* Breakdown */}
+                            {data.breakdown && (
                             <section className="rounded-xl border border-slate-800 bg-slate-800/30 p-4 space-y-4">
                                 <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Score breakdown</h3>
-                                <BreakdownBar label="Task completion rate" value={data.breakdown.taskCompletionRate} />
+                                <BreakdownBar label="Task completion rate" value={data.breakdown.completionRate} />
                                 <BreakdownBar label="On-time delivery" value={data.breakdown.onTimeRate} />
                                 <BreakdownBar
                                     label="Avg task complexity"
                                     value={data.breakdown.avgComplexity}
-                                    max={3}   /* complexity is 1–3 in SPEC */
+                                    max={5}
                                 />
-                                <BreakdownBar
-                                    label="Skill match bonus"
-                                    value={data.breakdown.skillBonus}
-                                    max={10}  /* bonus is 0–10 */
-                                />
+                                <div className="pt-2 flex justify-between text-xs text-slate-600">
+                                    <span>Tasks assigned: <span className="text-slate-400 font-medium">{data.breakdown.totalTasksAssigned}</span></span>
+                                    <span>Completed: <span className="text-slate-400 font-medium">{data.breakdown.totalCompleted}</span></span>
+                                </div>
                             </section>
+                            )}
 
-                            {/* Meta */}
-                            <div className="pt-2 flex justify-between text-xs text-slate-600">
-                                <span>Tasks counted: <span className="text-slate-400 font-medium">{data.breakdown.taskCount}</span></span>
-                                <span>Computed: {new Date(data.computedAt).toLocaleDateString()}</span>
+                            {/* Meta + badge */}
+                            <div className="pt-2 text-center text-xs text-slate-600">
+                                Computed: {new Date(data.computedAt).toLocaleDateString()}
                             </div>
 
                             {/* Score badge */}
                             <div className="flex justify-center">
                                 <ScoreBadge rate={data.score / 100} size="md" />
                             </div>
+                            </>
+                            )}
                         </>
                     ) : null}
                 </div>

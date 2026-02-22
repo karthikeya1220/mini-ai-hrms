@@ -383,7 +383,7 @@ export default function EmployeesPage() {
 
                                                 {/* Joined */}
                                                 <td className="px-4 py-3.5 text-xs text-slate-600 whitespace-nowrap">
-                                                    {joinedLabel(emp.joinedAt)}
+                                                    {joinedLabel(emp.createdAt)}
                                                 </td>
 
                                                 {/* Status */}

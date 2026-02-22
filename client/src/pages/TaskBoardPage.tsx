@@ -83,8 +83,11 @@ export default function TaskBoardPage() {
     const { logTaskCompletion, account } = useWeb3Context();
 
     // ── Task data ──────────────────────────────────────────────────────────────
+    // Server automatically scopes GET /api/tasks to the authenticated employee's
+    // own tasks when role === EMPLOYEE (assignedTo forced to req.user.employeeId).
+    // No client-side branching needed.
     const { tasks, total, loading, error, refetch, addTask, moveTask } =
-        useTasks({ limit: 100 }, !isAdmin);
+        useTasks({ limit: 100 });
 
     // ── Employees (for assignee names + modal dropdown) ────────────────────────
     const { employees } = useEmployees({ isActive: 'true', limit: 100 });

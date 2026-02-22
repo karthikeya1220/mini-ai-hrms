@@ -2,12 +2,13 @@
 // Entry point — loads env, boots the HTTP server, handles shutdown.
 //
 // Boot sequence:
-//   1. dotenv/config   — populate process.env (MUST be first import)
-//   2. initRedis()     — connect the dashboard-cache Redis singleton (optional)
-//   3. initScoringQueue() — connect BullMQ queue + worker (optional, needs Redis)
-//   4. createApp()     — build Express app + register routes
-//   5. app.listen()    — bind HTTP port
-//   6. SIGTERM/SIGINT  — graceful shutdown (worker drain → queue close → Redis close → Prisma close)
+//   1. dotenv/config      — populate process.env (MUST be first import)
+//   2. PORT guard         — fail fast if PORT is not set (prevents proxy mismatch)
+//   3. initRedis()        — connect the dashboard-cache Redis singleton (optional)
+//   4. initScoringQueue() — connect BullMQ queue + worker (optional, needs Redis)
+//   5. createApp()        — build Express app + register routes
+//   6. app.listen()       — bind HTTP port
+//   7. SIGTERM/SIGINT     — graceful shutdown (worker drain → queue close → Redis close → Prisma close)
 // =============================================================================
 
 import 'dotenv/config'; // side-effect import — populates process.env from .env
@@ -23,7 +24,20 @@ import { initScoringQueue, closeScoringQueue } from './lib/scoringQueue';
 initRedis();
 initScoringQueue();
 
-const PORT = parseInt(process.env.PORT ?? '3001', 10);
+// ── PORT — required, no silent fallback ───────────────────────────────────────
+// A missing PORT would cause the server to bind on an arbitrary default while
+// the Vite proxy (and any other client) targets a different port, making every
+// API call fail with ECONNREFUSED.  Fail fast here so the misconfiguration is
+// caught immediately at startup, not silently at runtime.
+if (!process.env.PORT) {
+    console.error(
+        '[server] Fatal: PORT environment variable is not set.\n' +
+        '         Add PORT=3000 to server/.env and restart.'
+    );
+    process.exit(1);
+}
+
+const PORT = parseInt(process.env.PORT, 10);
 
 async function main(): Promise<void> {
     const app = createApp();

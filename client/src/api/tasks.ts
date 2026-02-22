@@ -70,16 +70,6 @@ export async function listTasks(params: ListTaskParams = {}): Promise<PaginatedT
     return res.data.data;
 }
 
-export async function listMyTasks(params: ListTaskParams = {}): Promise<PaginatedTasks> {
-    const qs = new URLSearchParams();
-    if (params.status) qs.set('status', params.status);
-    if (params.priority) qs.set('priority', params.priority);
-    if (params.limit) qs.set('limit', String(params.limit));
-    if (params.cursor) qs.set('cursor', params.cursor);
-    const res = await client.get<{ success: true; data: PaginatedTasks }>(`/tasks/my${qs.toString() ? '?' + qs : ''}`);
-    return res.data.data;
-}
-
 export async function createTask(data: CreateTaskInput): Promise<Task> {
     const res = await client.post<{ success: true; data: Task }>('/tasks', data);
     return res.data.data;

@@ -12,14 +12,14 @@
 //   - The caller (task.service.ts) wraps this in dispatchJob() and never
 //     awaits it in the request path.
 //
-// Environment variables required:
-//   WORKFORCE_LOGGER_ADDRESS  — deployed contract address
+// Required environment variables (all three must be set to enable web3):
+//   WEB3_RPC_URL              — JSON-RPC URL (Alchemy / Infura / Amoy public node)
+//   WORKFORCE_LOGGER_ADDRESS  — deployed contract address (output of deploy script)
 //   DEPLOYER_PRIVATE_KEY      — private key of the wallet used to sign txs
-//   WEB3_RPC_URL              — JSON-RPC URL (Alchemy / Infura / local node)
 //
 // All three are optional at startup (the module initialises lazily).
-// If they are absent, every call logs a warning and is a no-op — the rest
-// of the application continues to function without web3.
+// If any are absent, getClient() logs a per-variable warning and returns null —
+// every public function becomes a no-op and the rest of the app runs normally.
 // =============================================================================
 
 import { ethers } from "ethers";
@@ -50,22 +50,29 @@ let _client: Web3Client | null = null;
 function getClient(): Web3Client | null {
     if (_client) return _client;
 
-    const rpcUrl = process.env.WEB3_RPC_URL;
+    const rpcUrl  = process.env.WEB3_RPC_URL;
     const privKey = process.env.DEPLOYER_PRIVATE_KEY;
     const address = process.env.WORKFORCE_LOGGER_ADDRESS;
 
-    if (!rpcUrl || !privKey || !address) {
-        // Non-fatal: web3 is optional in dev/test environments
+    // Report each missing variable individually so the developer knows exactly
+    // which value(s) to add to .env — a single combined message hides the root cause.
+    const missing: string[] = [];
+    if (!rpcUrl)  missing.push('WEB3_RPC_URL');
+    if (!privKey) missing.push('DEPLOYER_PRIVATE_KEY');
+    if (!address) missing.push('WORKFORCE_LOGGER_ADDRESS');
+
+    if (missing.length > 0) {
         console.warn(
-            "[web3] WEB3_RPC_URL / DEPLOYER_PRIVATE_KEY / WORKFORCE_LOGGER_ADDRESS " +
-            "not set — blockchain logging disabled."
+            `[web3] Blockchain logging disabled — missing env var(s): ${missing.join(', ')}.\n` +
+            `       Set them in server/.env to enable on-chain task logging.`
         );
         return null;
     }
 
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const signer = new ethers.Wallet(privKey, provider);
-    const contract = new ethers.Contract(address, ABI, signer);
+    // All three are guaranteed non-empty strings past this point.
+    const provider = new ethers.JsonRpcProvider(rpcUrl as string);
+    const signer   = new ethers.Wallet(privKey as string, provider);
+    const contract = new ethers.Contract(address as string, ABI, signer);
 
     _client = { contract, signer, provider };
     return _client;

@@ -65,7 +65,7 @@ type PrismaEmployeeRow = {
 function mapRow(row: PrismaEmployeeRow): EmployeeRow {
     return {
         ...row,
-        role: row.role as any,
+        role: row.role as UserRole,
     };
 }
 
@@ -138,7 +138,7 @@ export async function createEmployee(
     try {
         const result = await prisma.$transaction(async (tx) => {
             // Step A — Employee profile
-            const employee = await (tx.employee as any).create({
+            const employee = await tx.employee.create({
                 data: {
                     orgId,
                     name:          input.name,
@@ -153,7 +153,7 @@ export async function createEmployee(
             });
 
             // Step B — User auth account linked to the employee
-            const user = await (tx as any).user.create({
+            const user = await tx.user.create({
                 data: {
                     orgId,
                     employeeId:   employee.id,   // FK → employees(id)
@@ -173,7 +173,12 @@ export async function createEmployee(
                 },
             });
 
-            return { employee: mapRow(employee), user };
+            return {
+                employee: mapRow(employee),
+                // employeeId is guaranteed non-null: we supplied employee.id above.
+                // The Prisma column is nullable (String?) so we narrow here.
+                user: { ...user, employeeId: user.employeeId! },
+            };
         });
 
         return { ...result, temporaryPassword };
@@ -234,7 +239,7 @@ export async function listEmployees(
     // If we got limit+1 rows, there is a next page
     const hasMore = rows.length > limit;
     const dataRaw = hasMore ? rows.slice(0, limit) : rows;
-    const data = dataRaw.map((r: any) => mapRow(r));
+    const data = dataRaw.map((r) => mapRow(r));
     const nextCursor = hasMore ? (data[data.length - 1]?.id ?? null) : null;
 
     return { data, nextCursor, total };
@@ -262,7 +267,7 @@ export async function getEmployeeById(
         throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
     }
 
-    return mapRow(employee as any);
+    return mapRow(employee);
 }
 
 // ─── UPDATE ───────────────────────────────────────────────────────────────────
@@ -334,7 +339,7 @@ export async function updateEmployee(
         where: { id: employeeId },
         select: EMPLOYEE_SELECT,
     });
-    return mapRow(employee as any);
+    return mapRow(employee);
 }
 
 // ─── SOFT DELETE ──────────────────────────────────────────────────────────────
@@ -371,7 +376,7 @@ export async function deactivateEmployee(
         where: { id: employeeId },
         select: EMPLOYEE_SELECT,
     });
-    return mapRow(employee as any);
+    return mapRow(employee);
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────

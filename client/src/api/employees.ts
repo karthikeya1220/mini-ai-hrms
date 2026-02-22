@@ -18,7 +18,7 @@ export interface Employee {
     skills: string[];
     isActive: boolean;
     walletAddress: string | null;
-    joinedAt: string;   // ISO
+    createdAt: string;   // ISO — server field name
 }
 
 export interface PaginatedEmployees {
@@ -39,20 +39,22 @@ export interface EmployeeInput {
 // ─── AI score types ───────────────────────────────────────────────────────────
 
 export interface ScoreBreakdown {
-    taskCompletionRate: number;   // 0–1
-    onTimeRate: number;
-    avgComplexity: number;
-    skillBonus: number;
-    taskCount: number;
+    completionRate: number;        // 0–1  (server field name)
+    onTimeRate: number;            // 0–1
+    avgComplexity: number;         // 1–5
+    totalTasksAssigned: number;
+    totalCompleted: number;
+    totalOnTime: number;
 }
 
 export interface ProductivityScore {
     employeeId: string;
-    score: number;      // 0–100
-    grade: string;      // A+/A/B/C/D
-    breakdown: ScoreBreakdown;
-    trend: number;      // positive = improving
-    computedAt: string;      // ISO
+    name: string;
+    score: number | null;          // null when no tasks assigned
+    grade: string | null;          // null when score is null
+    breakdown: ScoreBreakdown | null;
+    trend: 'improving' | 'declining' | 'stable' | 'insufficient_data';
+    computedAt: string;            // ISO
 }
 
 // ─── Employee CRUD ────────────────────────────────────────────────────────────
@@ -78,8 +80,8 @@ export async function listEmployees(params: ListParams = {}): Promise<PaginatedE
 }
 
 export async function createEmployee(data: EmployeeInput): Promise<Employee> {
-    const res = await client.post<{ success: true; data: Employee }>('/employees', data);
-    return res.data.data;
+    const res = await client.post<{ success: true; data: { employee: Employee; temporaryPassword: string } }>('/employees', data);
+    return res.data.data.employee;
 }
 
 export async function updateEmployee(id: string, data: Partial<EmployeeInput>): Promise<Employee> {

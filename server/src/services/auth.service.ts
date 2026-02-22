@@ -29,9 +29,7 @@ import prisma from '../lib/prisma';
 // Defined locally so this file compiles before `prisma generate` has run
 // against the new migration.  Once the client is regenerated, callers may
 // import Role from '@prisma/client' and pass it here — the types are identical.
-export type Role = 'ADMIN' | 'EMPLOYEE';
-
-// ─── Input shape ──────────────────────────────────────────────────────────────
+export type Role = 'ADMIN' | 'EMPLOYEE';// ─── Input shape ──────────────────────────────────────────────────────────────
 // The minimal slice of the Prisma User row that token functions need.
 // Callers (controllers / auth middleware) fetch the full User row and pass it
 // here — the service never touches the database itself.
@@ -357,7 +355,7 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
       //    Defaults to ADMIN (org-owner self-registration path).
       //    employeeId is intentionally omitted (null) — the User exists at the
       //    auth layer; an Employee profile is a separate business-logic concern.
-      const user = await (tx as any).user.create({
+      const user = await tx.user.create({
         data: {
           orgId:        org.id,
           email,
@@ -409,7 +407,7 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
     if (
       typeof err === 'object' &&
       err !== null &&
-      (err as any).code === 'P2002'
+      (err as { code: unknown }).code === 'P2002'
     ) {
       throw new AppError(409, 'EMAIL_TAKEN', 'An account with this email already exists.');
     }
@@ -460,8 +458,7 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
   const { email, password } = input;
 
   // 1. Fetch the user row — include passwordHash for comparison only.
-  //    (tx as any) cast mirrors registerUser; remove once prisma generate runs.
-  const user = await (prisma as any).user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email },
     select: {
       id:           true,
@@ -569,8 +566,7 @@ export async function refreshAccessToken(rawToken: string): Promise<RefreshResul
   const payload = verifyRefreshToken(rawToken);
 
   // 2. Fetch current user state from DB.
-  //    (prisma as any) cast mirrors registerUser; remove once prisma generate runs.
-  const user = await (prisma as any).user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: payload.userId },
     select: {
       id:           true,
@@ -666,7 +662,7 @@ export async function logoutUser(rawToken: string | undefined): Promise<void> {
   // refresh token that embeds the old version.
   // updateMany: no error thrown if the user row was deleted between the
   // cookie read and now (count === 0 is a valid silent outcome).
-  await (prisma as any).user.updateMany({
+  await prisma.user.updateMany({
     where: { id: userId },
     data:  { tokenVersion: { increment: 1 } },
   });
