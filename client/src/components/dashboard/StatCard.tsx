@@ -55,11 +55,11 @@ export function StatCard({
     return (
         <div
             className={`
-        relative overflow-hidden rounded-2xl border border-slate-800
-        bg-slate-900/70 backdrop-blur-sm p-6
+        relative overflow-hidden rounded-2xl border border-white/8
+        bg-[#0f0f0f]/70 backdrop-blur-sm p-6
         transition-all duration-500
         ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
-        hover:border-slate-700 hover:shadow-lg hover:shadow-black/20
+        hover:border-white/15 hover:shadow-lg hover:shadow-black/20
         group
       `}
         >

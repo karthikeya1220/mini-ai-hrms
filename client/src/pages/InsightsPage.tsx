@@ -85,7 +85,7 @@ function MiniScoreRing({ score }: { score: number | null }) {
 
 function OverviewCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
     return (
-        <div className="flex flex-col gap-1 px-5 py-4 rounded-xl border border-slate-800 bg-slate-900">
+        <div className="flex flex-col gap-1 px-5 py-4 rounded-xl border border-white/8 bg-[#0f0f0f]">
             <span className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold">{label}</span>
             <span className="text-2xl font-bold text-white tabular-nums">{value}</span>
             {sub && <span className="text-xs text-slate-500">{sub}</span>}
@@ -115,7 +115,7 @@ function InsightCard({ stat, onViewDetails }: InsightCardProps) {
         score >= 60   ? 'C'    : 'D';
 
     return (
-        <article className="rounded-xl border border-slate-800 bg-slate-900 p-4 flex flex-col gap-3">
+        <article className="rounded-xl border border-white/8 bg-[#0f0f0f] p-4 flex flex-col gap-3">
             {/* Header row */}
             <div className="flex items-center gap-3">
                 <div
@@ -134,7 +134,7 @@ function InsightCard({ stat, onViewDetails }: InsightCardProps) {
 
             {/* Grade + status row */}
             <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-0.5 rounded-md border border-slate-700 bg-slate-800 font-semibold text-slate-300">
+                <span className="px-2 py-0.5 rounded-md border border-white/10 bg-white/5 font-semibold text-slate-300">
                     Grade {grade}
                 </span>
                 <span className={`${stat.isActive ? 'text-emerald-400' : 'text-slate-600'} flex items-center gap-1`}>
@@ -155,8 +155,8 @@ function InsightCard({ stat, onViewDetails }: InsightCardProps) {
                 onClick={onViewDetails}
                 className="
                     w-full mt-auto text-xs font-medium text-slate-400
-                    border border-slate-800 rounded-lg py-1.5
-                    hover:border-slate-600 hover:text-slate-200
+                    border border-white/8 rounded-lg py-1.5
+                    hover:border-white/15 hover:text-slate-200
                     transition-colors text-center
                 "
             >
@@ -209,7 +209,7 @@ function AssignHelper({ tasks, initialTaskId }: AssignHelperProps) {
     const taskTitle = openTasks.find(t => t.id === (fetched ?? selectedTaskId))?.title;
 
     return (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-4">
+        <div className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5 space-y-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                 Smart Assignment Helper
             </p>
@@ -226,9 +226,9 @@ function AssignHelper({ tasks, initialTaskId }: AssignHelperProps) {
                         onChange={e => { setSelectedTaskId(e.target.value); setRecs(null); setFetched(null); }}
                         className="
                             w-full px-3 py-2 rounded-lg
-                            border border-slate-700 bg-slate-800
+                            border border-white/10 bg-white/5
                             text-sm text-slate-200
-                            focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
+                            focus:outline-none focus:border-lime-400 focus:ring-2 focus:ring-lime-400/20
                         "
                     >
                         <option value="">— Choose a task —</option>
@@ -243,8 +243,8 @@ function AssignHelper({ tasks, initialTaskId }: AssignHelperProps) {
                     disabled={!selectedTaskId || loading}
                     className="
                         px-4 py-2 rounded-lg text-sm font-medium
-                        border border-indigo-500/40 bg-indigo-500/10 text-indigo-300
-                        hover:bg-indigo-500/20 hover:border-indigo-500/60
+                        border border-lime-400/30 bg-lime-400/10 text-lime-400
+                        hover:bg-lime-400/20 hover:border-lime-400/50
                         disabled:opacity-40 disabled:cursor-not-allowed
                         transition-colors flex items-center gap-2
                     "
@@ -271,10 +271,10 @@ function AssignHelper({ tasks, initialTaskId }: AssignHelperProps) {
                             {recs.map(r => (
                                 <div
                                     key={r.employee.id}
-                                    className="flex items-center gap-3 px-3 py-3 rounded-xl border border-slate-800 bg-slate-800/40"
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl border border-white/8 bg-white/3"
                                 >
                                     {/* Rank badge */}
-                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold text-slate-400">
                                         #{r.rank}
                                     </span>
 
@@ -369,10 +369,10 @@ export default function InsightsPage() {
     const lowCompletion = stats.filter(s => s.completionRate < 0.5).length;
 
     return (
-        <div className="min-h-dvh bg-slate-950 text-slate-100">
+        <div className="min-h-dvh bg-black text-slate-100">
 
             {/* ── Header ─────────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+            <header className="sticky top-0 z-10 border-b border-white/5 bg-black/85 backdrop-blur-xl">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
                     <h1 className="text-2xl font-semibold text-white tracking-tight">Insights</h1>
                 </div>
@@ -397,7 +397,7 @@ export default function InsightsPage() {
                     {dashLoading ? (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {[1,2,3,4].map(i => (
-                                <div key={i} className="h-20 rounded-xl bg-slate-800 animate-pulse" />
+                                <div key={i} className="h-20 rounded-xl bg-white/5 animate-pulse" />
                             ))}
                         </div>
                     ) : (
@@ -437,7 +437,7 @@ export default function InsightsPage() {
                     {dashLoading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {[1,2,3,4,5,6].map(i => (
-                                <div key={i} className="h-44 rounded-xl bg-slate-800 animate-pulse" />
+                                <div key={i} className="h-44 rounded-xl bg-white/5 animate-pulse" />
                             ))}
                         </div>
                     ) : stats.length === 0 ? (

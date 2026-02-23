@@ -79,10 +79,10 @@ function StatusDropdown({ current, taskId, onMove, disabled }: StatusDropdownPro
             onClick={e => e.stopPropagation()}
             className="
                 appearance-none text-[10px] font-medium px-2 py-0.5 pr-5 rounded-md
-                border border-slate-700 bg-slate-800 text-slate-300
-                focus:outline-none focus:border-indigo-500
+                border border-white/10 bg-[#0f0f0f] text-slate-300
+                focus:outline-none focus:border-lime-400
                 disabled:opacity-40 disabled:cursor-not-allowed
-                cursor-pointer transition-colors hover:border-slate-600
+                cursor-pointer transition-colors hover:border-white/20
                 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMUw2IDYgMTEgMSIgc3Ryb2tlPSIjNjQ3NDhiIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+')]
                 bg-no-repeat bg-[right_4px_center]
             "
@@ -126,13 +126,13 @@ export function TaskCard({
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(task.id); } }}
             aria-label={`Open task: ${task.title}`}
             className={`
-                relative rounded-xl border bg-slate-900 p-3 space-y-2
+                relative rounded-xl border bg-[#0f0f0f] p-3 space-y-2
                 select-none cursor-pointer
                 transition-colors duration-150
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400
                 ${moving
-                    ? 'opacity-50 border-indigo-500/50 scale-95'
-                    : 'border-slate-800 hover:border-slate-700'
+                    ? 'opacity-50 border-lime-400/50 scale-95'
+                    : 'border-white/10 hover:border-white/20'
                 }
                 ${task.status === 'COMPLETED' ? 'opacity-60' : ''}
             `}
@@ -177,7 +177,7 @@ export function TaskCard({
                             </a>
                         ) : (
                             <span
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-800 border border-slate-700 text-slate-500"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-white/5 border border-white/10 text-slate-500"
                                 title="No on-chain record for this task"
                             >
                                 Not Verified
@@ -201,8 +201,8 @@ export function TaskCard({
 
             {/* Moving overlay */}
             {moving && (
-                <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-slate-900/60" aria-hidden="true">
-                    <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+                <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-black/60" aria-hidden="true">
+                    <div className="w-4 h-4 rounded-full border-2 border-lime-400 border-t-transparent animate-spin" />
                 </div>
             )}
         </div>

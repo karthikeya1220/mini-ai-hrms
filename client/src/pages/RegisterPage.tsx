@@ -39,18 +39,18 @@ function validate(name: string, email: string, password: string, confirm: string
 // ─── Password strength meter ──────────────────────────────────────────────────
 
 function strengthOf(pwd: string): { score: number; label: string; color: string } {
-    if (!pwd) return { score: 0, label: '', color: 'bg-slate-800' };
+    if (!pwd) return { score: 0, label: '', color: 'bg-white/5' };
     let s = 0;
     if (pwd.length >= 8) s++;
     if (/[A-Z]/.test(pwd)) s++;
     if (/[0-9]/.test(pwd)) s++;
     if (/[^A-Za-z0-9]/.test(pwd)) s++;
     const map = [
-        { score: 0, label: '', color: 'bg-slate-800' },
+        { score: 0, label: '', color: 'bg-white/5' },
         { score: 1, label: 'Weak', color: 'bg-red-500' },
         { score: 2, label: 'Fair', color: 'bg-amber-500' },
         { score: 3, label: 'Good', color: 'bg-emerald-500' },
-        { score: 4, label: 'Strong', color: 'bg-indigo-500' },
+        { score: 4, label: 'Strong', color: 'bg-lime-400' },
     ];
     return map[s] ?? map[0];
 }
@@ -188,7 +188,7 @@ export default function RegisterPage() {
                                         <div
                                             key={i}
                                             className={`h-1 flex-1 rounded-full transition-all duration-300
-                        ${i <= strength.score ? strength.color : 'bg-slate-800'}`}
+                        ${i <= strength.score ? strength.color : 'bg-white/5'}`}
                                         />
                                     ))}
                                 </div>

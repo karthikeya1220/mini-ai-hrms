@@ -43,16 +43,17 @@ interface TileProps {
     value: string;
     label: string;
     sub: string;
+    valueClass?: string;
 }
 
-function Tile({ icon, value, label, sub }: TileProps) {
+function Tile({ icon, value, label, sub, valueClass = 'text-white' }: TileProps) {
     return (
-        <div className="flex items-center gap-3.5 flex-1 min-w-0 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3.5">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400">
+        <div className="flex items-center gap-3.5 flex-1 min-w-0 rounded-xl border border-white/10 bg-[#0f0f0f] px-4 py-3.5">
+            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-slate-400">
                 {icon}
             </span>
             <div className="min-w-0">
-                <p className="text-2xl font-extrabold text-white tabular-nums leading-none">{value}</p>
+                <p className={`text-2xl font-extrabold tabular-nums leading-none ${valueClass}`}>{value}</p>
                 <p className="text-xs font-medium text-slate-400 mt-1 leading-tight truncate">{label}</p>
                 <p className="text-[10px] text-slate-600 mt-0.5 truncate">{sub}</p>
             </div>
@@ -71,30 +72,40 @@ export function TeamHealthStrip({ data }: TeamHealthStripProps) {
 
     const completionPct = Math.round(data.completionRate * 100);
 
+    // Same colour logic as employee cards: ≥80 lime, ≥60 amber, <60 red
+    const scoreValueClass =
+        avgScore === null  ? 'text-slate-500'
+        : avgScore >= 80   ? 'text-lime-400'
+        : avgScore >= 60   ? 'text-amber-400'
+        :                    'text-red-400';
+
     return (
         <section aria-label="Team health summary">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-                Team Health
-            </h2>
-            <div className="flex flex-col sm:flex-row gap-2">
-                <Tile
-                    icon={<PeopleIcon />}
-                    value={String(data.activeEmployees)}
-                    label="Active Employees"
-                    sub={`${data.totalEmployees - data.activeEmployees} inactive`}
-                />
-                <Tile
-                    icon={<ScoreIcon />}
-                    value={avgScore !== null ? String(avgScore) : '—'}
-                    label="Avg Productivity Score"
-                    sub={scored.length > 0 ? `across ${scored.length} scored` : 'no scores yet'}
-                />
-                <Tile
-                    icon={<CheckIcon />}
-                    value={`${completionPct}%`}
-                    label="Task Completion"
-                    sub={`${data.tasksCompleted} of ${data.tasksAssigned} tasks done`}
-                />
+            <div className="rounded-2xl bg-slate-900/40 p-4">
+                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
+                    Team Health
+                </h2>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <Tile
+                        icon={<PeopleIcon />}
+                        value={String(data.activeEmployees)}
+                        label="Active Employees"
+                        sub={`${data.totalEmployees - data.activeEmployees} inactive`}
+                    />
+                    <Tile
+                        icon={<ScoreIcon />}
+                        value={avgScore !== null ? String(avgScore) : '—'}
+                        label="Avg Productivity Score"
+                        sub={scored.length > 0 ? `across ${scored.length} scored` : 'no scores yet'}
+                        valueClass={scoreValueClass}
+                    />
+                    <Tile
+                        icon={<CheckIcon />}
+                        value={`${completionPct}%`}
+                        label="Task Completion"
+                        sub={`${data.tasksCompleted} of ${data.tasksAssigned} tasks done`}
+                    />
+                </div>
             </div>
         </section>
     );

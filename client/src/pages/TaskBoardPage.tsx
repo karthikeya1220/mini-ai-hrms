@@ -40,8 +40,8 @@ function PriorityPill({ label, active, onClick }: { label: string; active: boole
         <button
             onClick={onClick}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active
-                ? 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
-                : 'border border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
+                ? 'bg-lime-400/10 border border-lime-400/20 text-lime-400'
+                : 'border border-white/8 text-slate-500 hover:border-white/15 hover:text-slate-300'
                 }`}
         >
             {label}
@@ -53,21 +53,21 @@ function PriorityPill({ label, active, onClick }: { label: string; active: boole
 
 function SkeletonCard() {
     return (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-3.5 space-y-2 animate-pulse">
+        <div className="rounded-xl border border-white/8 bg-[#0f0f0f] p-3.5 space-y-2 animate-pulse">
             <div className="flex gap-2">
-                <div className="w-2 h-2 rounded-full bg-slate-800 mt-1" />
+                <div className="w-2 h-2 rounded-full bg-white/5 mt-1" />
                 <div className="flex-1 space-y-1.5">
-                    <div className="h-3 rounded-full bg-slate-800 w-3/4" />
-                    <div className="h-3 rounded-full bg-slate-800 w-1/2" />
+                    <div className="h-3 rounded-full bg-white/5 w-3/4" />
+                    <div className="h-3 rounded-full bg-white/5 w-1/2" />
                 </div>
             </div>
             <div className="flex gap-1 pl-4">
-                <div className="h-4 w-12 rounded bg-slate-800" />
-                <div className="h-4 w-10 rounded bg-slate-800" />
+                <div className="h-4 w-12 rounded bg-white/5" />
+                <div className="h-4 w-10 rounded bg-white/5" />
             </div>
             <div className="flex justify-between pl-4">
-                <div className="h-3 w-20 rounded-full bg-slate-800" />
-                <div className="h-4 w-16 rounded bg-slate-800" />
+                <div className="h-3 w-20 rounded-full bg-white/5" />
+                <div className="h-4 w-16 rounded bg-white/5" />
             </div>
         </div>
     );
@@ -226,9 +226,9 @@ export default function TaskBoardPage() {
     ];
 
     return (
-        <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col">
+        <div className="min-h-dvh bg-black text-slate-100 flex flex-col">
             {/* ── Page Header ───────────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+            <header className="sticky top-0 z-10 border-b border-white/5 bg-black/85 backdrop-blur-xl">
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
                     <h1 className="text-base sm:text-xl font-semibold text-white flex-shrink-0">Task Board</h1>
                     <div className="flex items-center gap-2">
@@ -243,7 +243,7 @@ export default function TaskBoardPage() {
                                 placeholder="Search tasks…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/70 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 w-36 md:w-44 transition-all"
+                                className="pl-8 pr-3 py-1.5 rounded-lg border border-white/8 bg-[#0f0f0f]/70 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-lime-400 focus:ring-2 focus:ring-lime-400/20 w-36 md:w-44 transition-all"
                             />
                         </div>
 
@@ -252,7 +252,7 @@ export default function TaskBoardPage() {
                             id="btn-tasks-refresh"
                             onClick={refetch}
                             disabled={loading}
-                            className="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 transition-all disabled:opacity-40"
+                            className="p-1.5 rounded-lg border border-white/8 text-slate-400 hover:border-white/15 hover:text-slate-200 transition-all disabled:opacity-40"
                             title="Refresh board"
                         >
                             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
@@ -276,7 +276,7 @@ export default function TaskBoardPage() {
             </header>
 
             {/* Sub-header: board title + on-chain indicator + priority filters */}
-            <div className="border-b border-slate-900 bg-slate-950/90 backdrop-blur-md sticky top-14 z-10">
+            <div className="border-b border-white/5 bg-black/85 backdrop-blur-xl sticky top-14 z-10">
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4 overflow-x-auto scrollbar-none">
                     <div className="flex items-center gap-3 flex-shrink-0">
                         <span className="text-xs text-slate-600 whitespace-nowrap">

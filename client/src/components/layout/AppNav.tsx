@@ -36,15 +36,8 @@ interface AppNavProps {
 // ─── SVG helpers ─────────────────────────────────────────────────────────────
 
 const LogoIcon = () => (
-    <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        className="w-4 h-4 text-white"
-    >
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-        <path d="M8 12h8M12 8v8" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" className="w-4 h-4">
+        <path d="M12 3L4 20h16L12 3z" /><line x1="7.5" y1="13" x2="16.5" y2="13" />
     </svg>
 );
 
@@ -74,8 +67,8 @@ function RolePill({ role }: { role: 'ADMIN' | 'EMPLOYEE' }) {
                 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
                 tracking-wide border select-none
                 ${isAdmin
-                    ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
-                    : 'bg-slate-700/50 border-slate-600/50 text-slate-400'}
+                    ? 'bg-lime-400/10 border-lime-400/20 text-lime-400'
+                    : 'bg-white/5 border-white/10 text-slate-400'}
             `}
         >
             {isAdmin ? (
@@ -100,7 +93,7 @@ function RolePill({ role }: { role: 'ADMIN' | 'EMPLOYEE' }) {
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
     if (active) {
         return (
-            <span className="text-slate-200 font-semibold px-3 py-1.5 bg-slate-800 rounded-lg shadow-sm">
+            <span className="text-lime-400 font-semibold px-3 py-1.5 bg-lime-400/10 rounded-lg border border-lime-400/20">
                 {label}
             </span>
         );
@@ -108,7 +101,7 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
     return (
         <a
             href={href}
-            className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800 font-medium"
+            className="text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5 font-medium"
         >
             {label}
         </a>
@@ -121,7 +114,7 @@ export function AppNav({ currentPage, actions }: AppNavProps) {
     const { user, org, isAdmin, logout } = useAuth();
 
     return (
-        <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+        <header className="sticky top-0 z-20 border-b border-white/5 bg-black/85 backdrop-blur-xl">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
 
                 {/* ── Left: brand + nav ─────────────────────────────────────── */}
@@ -129,7 +122,7 @@ export function AppNav({ currentPage, actions }: AppNavProps) {
 
                     {/* Brand */}
                     <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-lime-400 flex items-center justify-center flex-shrink-0 shadow-sm shadow-lime-400/25">
                             <LogoIcon />
                         </div>
                         <div className="hidden md:block">
@@ -145,7 +138,7 @@ export function AppNav({ currentPage, actions }: AppNavProps) {
 
                     {/* Nav — role-gated */}
                     <nav
-                        className="flex items-center gap-1 text-sm bg-slate-900/50 p-1 rounded-xl border border-slate-800/50"
+                        className="flex items-center gap-1 text-sm bg-white/3 p-1 rounded-xl border border-white/5"
                         aria-label="Main navigation"
                     >
                         {/* Dashboard and Employees — ADMIN only */}
@@ -177,7 +170,7 @@ export function AppNav({ currentPage, actions }: AppNavProps) {
                     {actions}
                     <button
                         onClick={logout}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400 hover:border-red-500/50 hover:text-red-400 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/8 text-xs text-slate-400 hover:border-red-500/50 hover:text-red-400 transition-all"
                         title="Sign out"
                     >
                         <LogoutIcon />

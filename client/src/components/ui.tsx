@@ -62,11 +62,10 @@ export function Spinner({ className = 'w-5 h-5' }: { className?: string }) {
 
 export function LogoMark() {
     return (
-        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 mb-6">
+        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-lime-400 mb-6 shadow-lg shadow-lime-400/25">
             {/* Stylised HR / brain mark */}
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                <path d="M8 12h8M12 8v8" />
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-black" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3L4 20h16L12 3z" /><line x1="7.5" y1="13" x2="16.5" y2="13" />
             </svg>
         </div>
     );
@@ -77,9 +76,9 @@ export function LogoMark() {
 export function OrDivider() {
     return (
         <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-slate-800" />
+            <div className="flex-1 h-px bg-white/8" />
             <span className="text-xs text-slate-600 font-medium tracking-widest uppercase">or</span>
-            <div className="flex-1 h-px bg-slate-800" />
+            <div className="flex-1 h-px bg-white/8" />
         </div>
     );
 }

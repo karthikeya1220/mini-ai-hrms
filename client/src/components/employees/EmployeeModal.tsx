@@ -35,14 +35,14 @@ function SkillsInput({
     return (
         <div>
             <label htmlFor={uid} className="field-label">Skills</label>
-            <div className="flex flex-wrap gap-1.5 min-h-[44px] rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+            <div className="flex flex-wrap gap-1.5 min-h-[44px] rounded-xl border border-white/10 bg-[#0f0f0f]/60 px-3 py-2 focus-within:border-lime-400 focus-within:ring-2 focus-within:ring-lime-400/20 transition-all">
                 {value.map(s => (
-                    <span key={s} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-xs text-indigo-300">
+                    <span key={s} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-lime-400/10 border border-lime-400/20 text-xs text-lime-400">
                         {s}
                         <button
                             type="button"
                             onClick={() => onChange(value.filter(x => x !== s))}
-                            className="ml-1 text-indigo-400 hover:text-indigo-200 transition-colors leading-none"
+                            className="ml-1 text-lime-400 hover:text-lime-200 transition-colors leading-none"
                             aria-label={`Remove ${s}`}
                         >
                             ×
@@ -149,15 +149,15 @@ export function EmployeeModal({ mode, initial, onSave, onClose }: Props) {
                 role="dialog"
                 aria-modal
                 aria-label={title}
-                className="fixed inset-y-0 right-0 z-50 w-full max-w-md flex flex-col bg-slate-900 border-l border-slate-800 shadow-2xl animate-slide-up"
+                className="fixed inset-y-0 right-0 z-50 w-full max-w-md flex flex-col bg-[#0a0a0a] border-l border-white/8 shadow-2xl animate-slide-up"
                 style={{ animation: 'slideInRight 0.25s cubic-bezier(0.25,0.46,0.45,0.94)' }}
             >
                 {/* Header */}
-                <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                <header className="flex items-center justify-between px-6 py-4 border-b border-white/8">
                     <h2 className="text-base font-semibold text-white">{title}</h2>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
                         aria-label="Close"
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -253,11 +253,11 @@ export function EmployeeModal({ mode, initial, onSave, onClose }: Props) {
                 </form>
 
                 {/* Footer */}
-                <footer className="px-6 py-4 border-t border-slate-800 flex gap-3">
+                <footer className="px-6 py-4 border-t border-white/8 flex gap-3">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:border-slate-600 hover:text-slate-200 transition-all"
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-sm text-slate-400 hover:border-white/20 hover:text-slate-200 transition-all"
                         disabled={saving}
                     >
                         Cancel

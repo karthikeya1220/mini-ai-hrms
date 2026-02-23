@@ -71,7 +71,7 @@ function ComplexityDots({ score }: { score: number }) {
             {Array.from({ length: 5 }, (_, i) => (
                 <span
                     key={i}
-                    className={`inline-block w-2 h-2 rounded-full ${i < score ? 'bg-indigo-400' : 'bg-slate-800'}`}
+                    className={`inline-block w-2 h-2 rounded-full ${i < score ? 'bg-lime-400' : 'bg-white/10'}`}
                 />
             ))}
         </span>
@@ -110,8 +110,8 @@ function StatusControl({ task, onMove, moving }: StatusControlProps) {
                 disabled={moving}
                 className="
                     flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                    border border-slate-700 text-xs font-medium text-slate-300
-                    hover:border-indigo-500/60 hover:text-indigo-300 hover:bg-indigo-500/5
+                    border border-white/10 text-xs font-medium text-slate-300
+                    hover:border-lime-400/60 hover:text-lime-400 hover:bg-lime-400/5
                     disabled:opacity-40 disabled:cursor-not-allowed
                     transition-colors
                 "
@@ -182,8 +182,8 @@ export function TaskDetailDrawer({
                 aria-modal
                 aria-label={`Task detail: ${task.title}`}
                 className="
-                    fixed z-50 flex flex-col bg-slate-900 shadow-2xl
-                    inset-x-0 bottom-0 rounded-t-2xl border-t border-slate-800 h-[90dvh]
+                    fixed z-50 flex flex-col bg-[#0a0a0a] shadow-2xl
+                    inset-x-0 bottom-0 rounded-t-2xl border-t border-white/8 h-[90dvh]
                     md:inset-y-0 md:right-0 md:left-auto md:bottom-auto
                     md:h-full md:w-full md:max-w-md
                     md:border-l md:border-t-0 md:rounded-none
@@ -191,7 +191,7 @@ export function TaskDetailDrawer({
                 style={{ animation: 'slideInRight 0.22s ease both' }}
             >
                 {/* ── Header ── */}
-                <header className="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0">
+                <header className="flex items-center justify-between px-5 py-4 border-b border-white/8 flex-shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
                         <span className={`flex-shrink-0 w-2.5 h-2.5 rounded-full ${p.dot}`} title={p.label} aria-label={`Priority: ${p.label}`} />
                         <h2 className="text-sm font-semibold text-white truncate">{task.title}</h2>
@@ -199,7 +199,7 @@ export function TaskDetailDrawer({
                     <button
                         ref={closeButtonRef}
                         onClick={onClose}
-                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors ml-2"
+                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors ml-2"
                         aria-label="Close task detail"
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -273,7 +273,7 @@ export function TaskDetailDrawer({
                                 {task.requiredSkills.map(s => (
                                     <span
                                         key={s}
-                                        className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400"
+                                        className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-lime-400/10 border border-lime-400/20 text-lime-400"
                                     >
                                         {s}
                                     </span>
@@ -315,7 +315,7 @@ export function TaskDetailDrawer({
                                     href={`https://amoy.polygonscan.com/tx/${task.txHash}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[10px] tabular-nums text-slate-500 hover:text-violet-400 border border-slate-800 hover:border-violet-500/40 rounded px-1.5 py-0.5 transition-colors"
+                                    className="inline-flex items-center gap-1 text-[10px] tabular-nums text-slate-500 hover:text-lime-400 border border-white/8 hover:border-lime-400/40 rounded px-1.5 py-0.5 transition-colors"
                                     aria-label="View transaction on PolygonScan"
                                 >
                                     {task.txHash.slice(0, 8)}…{task.txHash.slice(-6)}
@@ -327,7 +327,7 @@ export function TaskDetailDrawer({
                                 </a>
                             </div>
                         ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-500">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 border border-white/10 text-slate-500">
                                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                                     <circle cx="12" cy="12" r="10" />
                                     <line x1="12" y1="8" x2="12" y2="12" />
@@ -349,9 +349,9 @@ export function TaskDetailDrawer({
                                 }}
                                 className="
                                     flex items-center gap-1.5 text-xs font-medium
-                                    text-indigo-400 hover:text-indigo-300
-                                    border border-indigo-500/20 bg-indigo-500/5
-                                    hover:bg-indigo-500/10 hover:border-indigo-500/40
+                                    text-lime-400 hover:text-lime-300
+                                    border border-lime-400/20 bg-lime-400/5
+                                    hover:bg-lime-400/10 hover:border-lime-400/40
                                     px-3 py-1.5 rounded-lg transition-colors duration-150
                                 "
                             >

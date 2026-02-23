@@ -21,8 +21,8 @@ import { useAuth } from '../../context/AuthContext';
 
 function AuthSpinner() {
     return (
-        <div className="min-h-dvh flex items-center justify-center bg-slate-950">
-            <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+        <div className="min-h-dvh flex items-center justify-center bg-black">
+            <div className="w-8 h-8 rounded-full border-2 border-lime-400 border-t-transparent animate-spin" />
         </div>
     );
 }

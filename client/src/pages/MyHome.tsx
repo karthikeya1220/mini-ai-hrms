@@ -124,7 +124,7 @@ function TrendBadge({ trend }: { trend: ProductivityScore['trend'] }) {
 
 function StatPill({ label, value }: { label: string; value: string }) {
     return (
-        <div className="flex flex-col items-center gap-0.5 px-3 sm:px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 min-w-[72px] sm:min-w-[90px] flex-1 sm:flex-none">
+        <div className="flex flex-col items-center gap-0.5 px-3 sm:px-4 py-3 rounded-xl bg-white/5 border border-white/10 min-w-[72px] sm:min-w-[90px] flex-1 sm:flex-none">
             <span className="text-base font-bold text-white tabular-nums">{value}</span>
             <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
         </div>
@@ -148,7 +148,7 @@ function WorkSummary({ tasks }: WorkSummaryProps) {
         <div className="flex flex-wrap gap-2 sm:gap-3 items-stretch">
             <StatPill label="Active" value={String(active.length)} />
             <StatPill label="Overdue" value={String(overdue.length)} />
-            <div className="flex flex-col gap-0.5 px-3 sm:px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 flex-1 sm:flex-none">
+            <div className="flex flex-col gap-0.5 px-3 sm:px-4 py-3 rounded-xl bg-white/5 border border-white/10 flex-1 sm:flex-none">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wide">Next due</span>
                 <span className={`text-sm font-semibold tabular-nums ${upcoming ? dueDateColor(upcoming.dueDate) : 'text-slate-600'}`}>
                     {upcoming ? fmtDate(upcoming.dueDate) : 'None'}
@@ -172,10 +172,10 @@ function TaskRow({ task, onClick }: TaskRowProps) {
             onClick={() => onClick(task.id)}
             className="
                 w-full flex items-center gap-3 px-4 py-3
-                rounded-xl border border-slate-800 bg-slate-900
-                hover:border-slate-700 hover:bg-slate-800
+                rounded-xl border border-white/8 bg-[#0f0f0f]
+                hover:border-white/15 hover:bg-white/3
                 transition-colors duration-150 text-left
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/40
             "
         >
             {/* Priority dot */}
@@ -212,7 +212,7 @@ function TaskRow({ task, onClick }: TaskRowProps) {
                         Verified
                     </a>
                 ) : (
-                    <span className="flex-shrink-0 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 border border-slate-700 text-slate-500">
+                    <span className="flex-shrink-0 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 border border-white/10 text-slate-500">
                         Not Verified
                     </span>
                 )
@@ -377,7 +377,7 @@ export default function MyHome() {
                 {tasksLoading ? (
                     <div className="flex gap-3">
                         {[1,2,3].map(i => (
-                            <div key={i} className="h-16 w-24 rounded-xl bg-slate-800 animate-pulse" />
+                            <div key={i} className="h-16 w-24 rounded-xl bg-white/5 animate-pulse" />
                         ))}
                     </div>
                 ) : (
@@ -389,7 +389,7 @@ export default function MyHome() {
                     {tasksLoading && (
                         <div className="space-y-2">
                             {[1,2,3,4].map(i => (
-                                <div key={i} className="h-12 rounded-xl bg-slate-800 animate-pulse" />
+                                <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />
                             ))}
                         </div>
                     )}
@@ -417,11 +417,11 @@ export default function MyHome() {
                 </h2>
 
                 {perfLoading && (
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 animate-pulse h-48" />
+                    <div className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-6 animate-pulse h-48" />
                 )}
 
                 {!perfLoading && !user?.employeeId && (
-                    <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-500">
+                    <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] p-5 text-sm text-slate-500">
                         Your account is not linked to an employee profile yet. Contact your admin.
                     </div>
                 )}
@@ -435,7 +435,7 @@ export default function MyHome() {
                     <div className="space-y-4">
 
                         {/* ── Performance Card ──────────────────────────────── */}
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                        <div className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5">
                             <div className="flex items-center gap-6 flex-wrap">
 
                                 {/* Score Ring */}
@@ -476,7 +476,7 @@ export default function MyHome() {
 
                         {/* ── Skill Gap Panel ───────────────────────────────── */}
                         {skillGap && (
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                            <div className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5">
                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                                     Skill Gap
                                 </p>

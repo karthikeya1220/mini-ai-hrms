@@ -12,7 +12,7 @@ export const COLUMN_META: Record<
     ASSIGNED: {
         label: 'Assigned',
         accent: 'border-slate-500',
-        badge: 'bg-slate-800 text-slate-400',
+        badge: 'bg-white/5 text-slate-400',
         icon: (
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -22,8 +22,8 @@ export const COLUMN_META: Record<
     },
     IN_PROGRESS: {
         label: 'In Progress',
-        accent: 'border-indigo-500',
-        badge: 'bg-indigo-500/15 text-indigo-400',
+        accent: 'border-lime-400',
+        badge: 'bg-lime-400/15 text-lime-400',
         icon: (
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="23 4 23 10 17 10" />

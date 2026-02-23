@@ -95,10 +95,9 @@ export function Sidebar({ role }: SidebarProps) {
             {/* Logo + org */}
             <div className="p-5 pb-4 flex-shrink-0">
                 <div className="flex items-center gap-3 mb-7">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-white">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                            <path d="M8 12h8M12 8v8" />
+                    <div className="w-8 h-8 rounded-xl bg-lime-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-lime-400/20">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" className="w-4 h-4">
+                            <path d="M12 3L4 20h16L12 3z" /><line x1="7.5" y1="13" x2="16.5" y2="13" />
                         </svg>
                     </div>
                     <div className="min-w-0">
@@ -112,8 +111,8 @@ export function Sidebar({ role }: SidebarProps) {
                             className={({ isActive }) =>
                                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150
                                 ${isActive
-                                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 border border-transparent'}`
+                                    ? 'bg-lime-400/10 text-lime-400 border border-lime-400/20'
+                                    : 'text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent'}`
                             }
                         >
                             <span className="flex-shrink-0">{NAV_ICONS[link.to]}</span>
@@ -124,9 +123,9 @@ export function Sidebar({ role }: SidebarProps) {
             </div>
 
             {/* Footer */}
-            <div className="mt-auto p-5 border-t border-slate-800 space-y-3 flex-shrink-0">
+            <div className="mt-auto p-5 border-t border-white/5 space-y-3 flex-shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-white border border-slate-700 flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold text-white border border-white/10 flex-shrink-0">
                         {initials}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -136,12 +135,12 @@ export function Sidebar({ role }: SidebarProps) {
                 </div>
                 {!isAdmin && (
                     account ? (
-                        <div className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/40">
+                        <div className="px-3 py-2 rounded-lg border border-white/10 bg-white/5">
                             <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Wallet</p>
                             <p className="text-[10px] font-mono text-emerald-400 truncate">{account.slice(0, 6)}…{account.slice(-4)}</p>
                         </div>
                     ) : (
-                        <button onClick={connect} className="w-full px-3 py-2 rounded-lg border border-slate-700 text-[10px] text-slate-500 hover:text-slate-300 hover:border-slate-600 transition-colors text-left">
+                        <button onClick={connect} className="w-full px-3 py-2 rounded-lg border border-white/10 text-[10px] text-slate-500 hover:text-slate-300 hover:border-white/20 transition-colors text-left">
                             🔗 Connect Wallet
                         </button>
                     )
@@ -163,10 +162,9 @@ export function Sidebar({ role }: SidebarProps) {
     const railPanel = (
         <div className="flex flex-col items-center h-full py-4 gap-1">
             {/* Logo mark */}
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0 mb-4">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-white">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                    <path d="M8 12h8M12 8v8" />
+            <div className="w-9 h-9 rounded-xl bg-lime-400 flex items-center justify-center flex-shrink-0 mb-4 shadow-md shadow-lime-400/20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" className="w-4 h-4">
+                    <path d="M12 3L4 20h16L12 3z" /><line x1="7.5" y1="13" x2="16.5" y2="13" />
                 </svg>
             </div>
             {/* Nav icons */}
@@ -176,8 +174,8 @@ export function Sidebar({ role }: SidebarProps) {
                     className={({ isActive }) =>
                         `w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150
                         ${isActive
-                            ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25'
-                            : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800 border border-transparent'}`
+                            ? 'bg-lime-400/15 text-lime-400 border border-lime-400/25'
+                            : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 border border-transparent'}`
                     }
                 >
                     {NAV_ICONS[link.to]}
@@ -186,7 +184,7 @@ export function Sidebar({ role }: SidebarProps) {
             {/* Spacer + logout at bottom */}
             <div className="mt-auto flex flex-col items-center gap-3">
                 {/* Avatar */}
-                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-white border border-slate-700" title={user?.name ?? user?.email}>
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold text-white border border-white/10" title={user?.name ?? user?.email}>
                     {initials}
                 </div>
                 <button onClick={logout} title="Sign out"
@@ -204,28 +202,27 @@ export function Sidebar({ role }: SidebarProps) {
     return (
         <>
             {/* ── Desktop full sidebar (lg+) ──────────────────────────────── */}
-            <aside className="hidden lg:flex w-60 xl:w-64 flex-col bg-slate-900 border-r border-slate-800 h-screen sticky top-0 flex-shrink-0">
+            <aside className="hidden lg:flex w-60 xl:w-64 flex-col bg-[#0a0a0a] border-r border-white/5 h-screen sticky top-0 flex-shrink-0">
                 {fullPanel}
             </aside>
 
             {/* ── Tablet icon rail (md–lg) ────────────────────────────────── */}
-            <aside className="hidden md:flex lg:hidden w-16 flex-col bg-slate-900 border-r border-slate-800 h-screen sticky top-0 flex-shrink-0">
+            <aside className="hidden md:flex lg:hidden w-16 flex-col bg-[#0a0a0a] border-r border-white/5 h-screen sticky top-0 flex-shrink-0">
                 {railPanel}
             </aside>
 
             {/* ── Mobile top bar (< md) ───────────────────────────────────── */}
-            <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 bg-slate-950/90 border-b border-slate-800 backdrop-blur-md">
+            <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 bg-black/90 border-b border-white/5 backdrop-blur-xl">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 text-white">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                            <path d="M8 12h8M12 8v8" />
+                    <div className="w-7 h-7 rounded-lg bg-lime-400 flex items-center justify-center flex-shrink-0 shadow-sm shadow-lime-400/30">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" className="w-3.5 h-3.5">
+                            <path d="M12 3L4 20h16L12 3z" /><line x1="7.5" y1="13" x2="16.5" y2="13" />
                         </svg>
                     </div>
                     <span className="text-sm font-bold text-white truncate max-w-[140px]">{org?.name ?? 'Workspace'}</span>
                 </div>
                 <button onClick={() => setOpen(v => !v)}
-                    className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                    className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-colors"
                     aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open}>
                     <MenuIcon open={open} />
                 </button>
@@ -233,20 +230,20 @@ export function Sidebar({ role }: SidebarProps) {
 
             {/* ── Mobile drawer backdrop ──────────────────────────────────── */}
             {open && (
-                <div className="md:hidden fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm"
+                <div className="md:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
                     onClick={() => setOpen(false)} aria-hidden="true" />
             )}
 
             {/* ── Mobile drawer panel ─────────────────────────────────────── */}
             <aside
-                className={`md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 ease-out
+                className={`md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 bg-[#0a0a0a] border-r border-white/5 transform transition-transform duration-300 ease-out
                     ${open ? 'translate-x-0' : '-translate-x-full'}`}
                 aria-label="Navigation"
             >
-                <div className="flex items-center justify-between px-5 h-14 border-b border-slate-800 flex-shrink-0">
+                <div className="flex items-center justify-between px-5 h-14 border-b border-white/5 flex-shrink-0">
                     <span className="text-sm font-bold text-white truncate">{org?.name ?? 'Workspace'}</span>
                     <button onClick={() => setOpen(false)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-colors"
                         aria-label="Close menu">
                         <MenuIcon open={true} />
                     </button>

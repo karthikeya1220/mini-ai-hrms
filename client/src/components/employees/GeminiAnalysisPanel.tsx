@@ -51,7 +51,7 @@ const TREND_META: Record<'up' | 'down' | 'flat', { arrow: string; label: string;
 function LoadingState() {
     return (
         <div className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" />
             <p className="text-xs text-slate-500">Gemini is analysing…</p>
         </div>
     );
@@ -64,7 +64,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
             <p className="text-xs text-slate-400 max-w-[240px]">{message}</p>
             <button
                 onClick={onRetry}
-                className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 mt-1"
+                className="text-xs text-lime-400 hover:text-lime-300 underline underline-offset-2 mt-1"
             >
                 Retry
             </button>
@@ -232,7 +232,7 @@ function SkillGapTab({
                         {data.emergingSkills.map(skill => (
                             <span
                                 key={skill}
-                                className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/25 text-[11px] font-medium text-indigo-300"
+                                className="px-2 py-0.5 rounded-md bg-lime-400/10 border border-lime-400/20 text-[11px] font-medium text-lime-400"
                             >
                                 {skill}
                             </span>
@@ -251,7 +251,7 @@ function SkillGapTab({
                         {data.currentSkills.map(skill => (
                             <span
                                 key={skill}
-                                className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 text-[10px] text-slate-400"
+                                className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-slate-400"
                             >
                                 {skill}
                             </span>
@@ -301,7 +301,7 @@ function TrendTab({
             </div>
 
             {/* Confidence bar */}
-            <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <div
                     className={`h-full rounded-full transition-all duration-700 ${
                         data.confidence >= 75 ? 'bg-emerald-500' :
@@ -331,7 +331,7 @@ function TrendTab({
 
             {/* Forecast */}
             {data.forecast && (
-                <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+                <div className="rounded-lg border border-white/8 bg-white/3 p-3">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">7-Day Forecast</p>
                     <p className="text-xs text-slate-300 leading-relaxed">{data.forecast}</p>
                 </div>
@@ -441,9 +441,9 @@ export function GeminiAnalysisPanel({ employeeId, employeeName }: Props) {
     // ── Render ────────────────────────────────────────────────────────────────
 
     return (
-        <div className="rounded-xl border border-slate-700/60 bg-slate-900 overflow-hidden">
+        <div className="rounded-xl border border-white/8 bg-[#0a0a0a] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/60 bg-slate-800/50">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-white/3">
                 <span className="text-base">✨</span>
                 <div>
                     <p className="text-xs font-semibold text-white leading-none">Gemini AI Analysis</p>
@@ -453,14 +453,14 @@ export function GeminiAnalysisPanel({ employeeId, employeeName }: Props) {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-slate-700/60">
+            <div className="flex border-b border-white/8">
                 {TABS.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => handleTab(tab.id)}
                         className={`flex-1 py-2.5 text-[11px] font-medium transition-colors duration-150 ${
                             activeTab === tab.id
-                                ? 'text-indigo-300 border-b-2 border-indigo-400 bg-indigo-500/5'
+                                ? 'text-lime-400 border-b-2 border-lime-400 bg-lime-400/5'
                                 : 'text-slate-500 hover:text-slate-300'
                         }`}
                     >

@@ -21,25 +21,34 @@ interface AttentionPanelProps {
 
 const SEV = {
     red: {
-        idle:   'border-slate-800 hover:border-red-500/30 hover:bg-red-500/[0.03]',
-        active: 'border-red-500/50 bg-red-500/[0.06]',
-        num:    'text-red-300',
-        pill:   'bg-red-500/10 text-red-400',
-        dot:    'bg-red-500',
+        idle:        'border-white/10 hover:border-red-500/40 hover:bg-red-950/20',
+        active:      'border-red-500/50 bg-red-950/20',
+        accentIdle:  'border-l-4 border-l-red-500/40',
+        accentActive:'border-l-4 border-l-red-500',
+        num:         'text-red-300',
+        pill:        'bg-red-500/10 text-red-400',
+        dot:         'bg-red-500',
+        heading:     'text-red-400',
     },
     amber: {
-        idle:   'border-slate-800 hover:border-amber-500/30 hover:bg-amber-500/[0.03]',
-        active: 'border-amber-500/50 bg-amber-500/[0.06]',
-        num:    'text-amber-300',
-        pill:   'bg-amber-500/10 text-amber-400',
-        dot:    'bg-amber-500',
+        idle:        'border-white/10 hover:border-amber-500/40 hover:bg-amber-950/20',
+        active:      'border-amber-500/50 bg-amber-950/20',
+        accentIdle:  'border-l-4 border-l-amber-500/40',
+        accentActive:'border-l-4 border-l-amber-500',
+        num:         'text-amber-300',
+        pill:        'bg-amber-500/10 text-amber-400',
+        dot:         'bg-amber-500',
+        heading:     'text-amber-400',
     },
     violet: {
-        idle:   'border-slate-800 hover:border-violet-500/30 hover:bg-violet-500/[0.03]',
-        active: 'border-violet-500/50 bg-violet-500/[0.06]',
-        num:    'text-violet-300',
-        pill:   'bg-violet-500/10 text-violet-400',
-        dot:    'bg-violet-500',
+        idle:        'border-white/10 hover:border-violet-500/40 hover:bg-violet-950/20',
+        active:      'border-violet-500/50 bg-violet-950/20',
+        accentIdle:  'border-l-4 border-l-violet-500/40',
+        accentActive:'border-l-4 border-l-violet-500',
+        num:         'text-violet-300',
+        pill:        'bg-violet-500/10 text-violet-400',
+        dot:         'bg-violet-500',
+        heading:     'text-violet-400',
     },
 } as const;
 
@@ -100,11 +109,14 @@ function AttentionCard({
             aria-pressed={isActive}
             aria-label={`${card.label}: ${card.count}. ${isActive ? 'Click to clear filter.' : 'Click to filter employee list.'}`}
             className={`
-                group w-full text-left rounded-xl border bg-slate-900 p-5
-                flex flex-col gap-4
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60
+                group w-full text-left rounded-xl border bg-[#0f0f0f] p-4
+                flex flex-col gap-3
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60
                 transition-all duration-150
-                ${isActive ? s.active : s.idle}
+                ${isActive
+                    ? `${s.active} ${s.accentActive}`
+                    : `${s.idle} ${s.accentIdle}`
+                }
             `}
         >
             {/* Row 1 — icon + active indicator */}
@@ -127,7 +139,7 @@ function AttentionCard({
             {/* Row 3 — label + description */}
             <div>
                 <p className="text-sm font-semibold text-slate-200 leading-snug">{card.label}</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{card.description}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{card.description}</p>
             </div>
 
             {/* Row 4 — CTA hint */}
@@ -188,32 +200,42 @@ export function AttentionPanel({ data, onFilter, activeFilter }: AttentionPanelP
         },
     ];
 
+    // Derive heading colour from the active filter's severity
+    const activeSev = activeFilter && activeFilter !== ('none' as AttentionFilter)
+        ? cards.find(c => c.key === activeFilter)?.sev
+        : undefined;
+    const headingClass = activeSev
+        ? SEV[activeSev].heading
+        : 'text-slate-400';
+
     return (
         <section aria-label="Attention items requiring action">
-            <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                    Needs Attention
-                </h2>
-                {activeFilter && activeFilter !== ('none' as AttentionFilter) && (
-                    <button
-                        type="button"
-                        onClick={() => onFilter('none' as AttentionFilter)}
-                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                        aria-label="Clear filter"
-                    >
-                        Clear filter ×
-                    </button>
-                )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {cards.map(card => (
-                    <AttentionCard
-                        key={card.key}
-                        card={card}
-                        isActive={activeFilter === card.key}
-                        onClick={() => toggle(card.key)}
-                    />
-                ))}
+            <div className="rounded-2xl bg-slate-900/40 p-4">
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${headingClass}`}>
+                        Needs Attention
+                    </h2>
+                    {activeFilter && activeFilter !== ('none' as AttentionFilter) && (
+                        <button
+                            type="button"
+                            onClick={() => onFilter('none' as AttentionFilter)}
+                            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                            aria-label="Clear filter"
+                        >
+                            Clear filter ×
+                        </button>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {cards.map(card => (
+                        <AttentionCard
+                            key={card.key}
+                            card={card}
+                            isActive={activeFilter === card.key}
+                            onClick={() => toggle(card.key)}
+                        />
+                    ))}
+                </div>
             </div>
         </section>
     );

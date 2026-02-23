@@ -59,9 +59,9 @@ function BreakdownBar({ label, value, max = 1 }: { label: string; value: number;
                 <span className="text-slate-400">{label}</span>
                 <span className="text-slate-300 tabular-nums font-medium">{pct}%</span>
             </div>
-            <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <div
-                    className="h-full rounded-full bg-indigo-500 transition-all duration-700"
+                    className="h-full rounded-full bg-lime-400 transition-all duration-700"
                     style={{ width: `${pct}%` }}
                 />
             </div>
@@ -93,10 +93,10 @@ function SkillGapSection({ employeeId }: { employeeId: string }) {
     if (!gap || gap.requiredSkills.length === 0) return null;
 
     return (
-        <section className="rounded-xl border border-slate-800 bg-slate-800/20 p-4 space-y-3">
+        <section className="rounded-xl border border-white/8 bg-white/3 p-4 space-y-3">
             <div className="flex justify-between items-center">
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Skill Gap Analysis</h3>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-lime-400/10 text-lime-400 border border-lime-400/20">
                     {Math.round(gap.coverageRate * 100)}% Coverage
                 </span>
             </div>
@@ -162,18 +162,18 @@ export function ScorePanel({ employee, onClose }: Props) {
                 role="dialog"
                 aria-modal
                 aria-label={`Productivity score — ${employee.name}`}
-                className="fixed inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col bg-slate-900 border-l border-slate-800 shadow-2xl"
+                className="fixed inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col bg-[#0a0a0a] border-l border-white/8 shadow-2xl"
                 style={{ animation: 'slideInRight 0.22s ease both' }}
             >
                 {/* Header */}
-                <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                <header className="flex items-center justify-between px-6 py-4 border-b border-white/8">
                     <div>
                         <p className="text-sm font-semibold text-white">{employee.name}</p>
                         <p className="text-xs text-slate-500">{employee.jobTitle ?? 'No job title'}</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
                         aria-label="Close"
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -199,7 +199,7 @@ export function ScorePanel({ employee, onClose }: Props) {
                     ) : data ? (
                         <>
                             {data.score === null ? (
-                                <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6 text-center text-sm text-slate-500">
+                                <div className="rounded-xl border border-white/8 bg-white/3 p-6 text-center text-sm text-slate-500">
                                     No completed tasks yet — score will appear once a task is completed.
                                 </div>
                             ) : (
@@ -218,7 +218,7 @@ export function ScorePanel({ employee, onClose }: Props) {
 
                             {/* Breakdown */}
                             {data.breakdown && (
-                            <section className="rounded-xl border border-slate-800 bg-slate-800/30 p-4 space-y-4">
+                            <section className="rounded-xl border border-white/8 bg-white/3 p-4 space-y-4">
                                 <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Score breakdown</h3>
                                 <BreakdownBar label="Task completion rate" value={data.breakdown.completionRate} />
                                 <BreakdownBar label="On-time delivery" value={data.breakdown.onTimeRate} />

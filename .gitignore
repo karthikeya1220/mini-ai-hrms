@@ -8,3 +8,9 @@
 /SUBMISSION_CHECKLIST.md
 /DEMO_SCRIPT.md
 /CREDENTIALS.md
+/.env
+/.env.local
+/.env.production
+/.env.development
+/.env.test
+/DEMO_VIDEO_DELIVERABLE.md

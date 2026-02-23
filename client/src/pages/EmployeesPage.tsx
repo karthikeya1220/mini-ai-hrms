@@ -35,10 +35,10 @@ function joinedLabel(iso: string): string {
 
 function SkeletonRow() {
     return (
-        <tr className="border-b border-slate-800/40 animate-pulse">
+        <tr className="border-b border-white/5 animate-pulse">
             {[44, 120, 100, 80, 80, 60, 36].map((w, i) => (
                 <td key={i} className="px-4 py-4">
-                    <div className="h-3 rounded-full bg-slate-800" style={{ width: w }} />
+                    <div className="h-3 rounded-full bg-white/5" style={{ width: w }} />
                 </td>
             ))}
         </tr>
@@ -62,7 +62,7 @@ function ConfirmDialog({
         <>
             <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" onClick={onCancel} aria-hidden />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4 animate-fade-in">
+                <div className="bg-[#0f0f0f] border border-white/8 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4 animate-fade-in">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-500/15 border border-red-500/30 flex-shrink-0">
                             <svg className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -80,7 +80,7 @@ function ConfirmDialog({
                     <div className="flex gap-3">
                         <button
                             onClick={onCancel}
-                            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:border-slate-600 hover:text-slate-200 transition-all"
+                            className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-sm text-slate-400 hover:border-white/20 hover:text-slate-200 transition-all"
                             disabled={loading}
                         >
                             Cancel
@@ -107,7 +107,7 @@ function EmptyState({ onAdd, filtered }: { onAdd: () => void; filtered: boolean 
         <tr>
             <td colSpan={8} className="py-20 text-center">
                 <div className="flex flex-col items-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-800/60 flex items-center justify-center">
+                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center">
                         <svg className="w-7 h-7 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
@@ -138,8 +138,8 @@ function FilterPill({
         <button
             onClick={onClick}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active
-                ? 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
-                : 'border border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
+                ? 'bg-lime-400/10 border border-lime-400/20 text-lime-400'
+                : 'border border-white/8 text-slate-500 hover:border-white/15 hover:text-slate-300'
                 }`}
         >
             {label}
@@ -211,9 +211,9 @@ export default function EmployeesPage() {
     const COLS = ['Employee', 'Email', 'Role', 'Department', 'Skills', 'Joined', 'Status', ''];
 
     return (
-        <div className="min-h-dvh bg-slate-950 text-slate-100">
+        <div className="min-h-dvh bg-black text-slate-100">
             {/* ── Page Header ────────────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+            <header className="sticky top-0 z-10 border-b border-white/5 bg-black/85 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
                     <h1 className="text-base sm:text-xl font-semibold text-white truncate">Employees</h1>
                     <button
@@ -254,7 +254,7 @@ export default function EmployeesPage() {
                                 placeholder="Search name, role, skills…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-9 pr-4 py-2 rounded-xl border border-slate-800 bg-slate-900/70 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 w-60 transition-all"
+                                className="pl-9 pr-4 py-2 rounded-xl border border-white/8 bg-[#0f0f0f]/70 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-lime-400 focus:ring-2 focus:ring-lime-400/20 w-60 transition-all"
                             />
                         </div>
 
@@ -274,7 +274,7 @@ export default function EmployeesPage() {
                         <button
                             onClick={refetch}
                             disabled={loading}
-                            className="p-2 rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-all disabled:opacity-40"
+                            className="p-2 rounded-lg border border-white/8 text-slate-500 hover:text-slate-300 hover:border-white/15 transition-all disabled:opacity-40"
                             title="Refresh"
                         >
                             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -294,11 +294,11 @@ export default function EmployeesPage() {
                 )}
 
                 {/* ── Table card ─────────────────────────────────────────────────────── */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 backdrop-blur-sm overflow-hidden">
+                <div className="rounded-2xl border border-white/8 bg-[#0f0f0f]/70 backdrop-blur-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm min-w-[780px]">
                             <thead>
-                                <tr className="border-b border-slate-800">
+                                <tr className="border-b border-white/5">
                                     {COLS.map(h => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-600 first:pl-6 last:pr-6">
                                             {h}
@@ -319,8 +319,8 @@ export default function EmployeesPage() {
                                             <tr
                                                 key={emp.id}
                                                 className={`
-                          border-b border-slate-800/40 last:border-0 transition-colors duration-150
-                          hover:bg-slate-800/30 ${idx % 2 !== 0 ? 'bg-slate-900/20' : ''}
+                          border-b border-white/5 last:border-0 transition-colors duration-150
+                          hover:bg-white/3 ${idx % 2 !== 0 ? 'bg-white/[0.01]' : ''}
                           ${!emp.isActive ? 'opacity-60' : ''}
                         `}
                                             >
@@ -346,7 +346,7 @@ export default function EmployeesPage() {
 
                                                 {/* Email */}
                                                 <td className="px-4 py-3.5 text-slate-400 truncate max-w-[180px]">
-                                                    <a href={`mailto:${emp.email}`} className="hover:text-indigo-300 transition-colors">
+                                                    <a href={`mailto:${emp.email}`} className="hover:text-lime-400 transition-colors">
                                                         {emp.email}
                                                     </a>
                                                 </td>
@@ -357,7 +357,7 @@ export default function EmployeesPage() {
                                 </td>                                                {/* Department */}
                                                 <td className="px-4 py-3.5">
                                                     {emp.department ? (
-                                                        <span className="inline-flex text-xs px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+                                                        <span className="inline-flex text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                                                             {emp.department}
                                                         </span>
                                                     ) : <span className="text-slate-700">—</span>}
@@ -367,12 +367,12 @@ export default function EmployeesPage() {
                                                 <td className="px-4 py-3.5">
                                                     <div className="flex flex-wrap gap-1 max-w-[160px]">
                                                         {emp.skills.slice(0, 3).map(s => (
-                                                            <span key={s} className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                                                            <span key={s} className="text-xs px-2 py-0.5 rounded-md bg-lime-400/10 border border-lime-400/20 text-lime-400">
                                                                 {s}
                                                             </span>
                                                         ))}
                                                         {emp.skills.length > 3 && (
-                                                            <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-600">
+                                                            <span className="text-xs px-2 py-0.5 rounded-md bg-white/5 text-slate-500">
                                                                 +{emp.skills.length - 3}
                                                             </span>
                                                         )}
@@ -399,7 +399,7 @@ export default function EmployeesPage() {
                                                         <button
                                                             id={`btn-score-${emp.id}`}
                                                             onClick={() => navigate(`/insights?employeeId=${emp.id}`)}
-                                                            className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors duration-150"
+                                                            className="p-1.5 rounded-lg text-slate-600 hover:text-lime-400 hover:bg-lime-400/10 transition-colors duration-150"
                                                             title="View AI insights"
                                                         >
                                                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -411,7 +411,7 @@ export default function EmployeesPage() {
                                                         <button
                                                             id={`btn-edit-${emp.id}`}
                                                             onClick={() => { setSelected(emp); setModal('edit'); }}
-                                                            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-200 hover:bg-slate-800 transition-all"
+                                                            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-200 hover:bg-white/5 transition-all"
                                                             title="Edit employee"
                                                         >
                                                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -446,12 +446,12 @@ export default function EmployeesPage() {
 
                     {/* Load-more footer */}
                     {!loading && filtered.length > 0 && (
-                        <div className="px-6 py-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-600">
+                        <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-600">
                             <span>Showing {filtered.length} of {total}</span>
                             {filtered.length < total && (
                                 <button
                                     onClick={() => refetch()}
-                                    className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                                    className="text-lime-400 hover:text-lime-300 transition-colors"
                                 >
                                     Load more
                                 </button>

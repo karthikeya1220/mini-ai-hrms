@@ -30,7 +30,7 @@ const RefreshIcon = () => (
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton({ className = '' }: { className?: string }) {
-    return <div className={`rounded-xl bg-slate-800/60 animate-pulse ${className}`} />;
+    return <div className={`rounded-xl bg-white/5 animate-pulse ${className}`} />;
 }
 
 function DashboardSkeleton() {
@@ -74,7 +74,7 @@ function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => voi
             </div>
             <button
                 onClick={onRetry}
-                className="px-5 py-2 rounded-lg border border-slate-700 text-sm text-slate-300 hover:border-slate-600 hover:text-white transition-colors"
+                className="px-5 py-2 rounded-lg border border-white/10 text-sm text-slate-300 hover:border-white/20 hover:text-white transition-colors"
             >
                 Try again
             </button>
@@ -129,15 +129,22 @@ export default function DashboardPage() {
         return applyFilter(data.employeeStats, activeFilter);
     }, [data, activeFilter]);
 
+    const orgAvgScore = useMemo(() => {
+        if (!data) return null;
+        const scored = data.employeeStats.filter(e => e.productivityScore !== null);
+        if (scored.length === 0) return null;
+        return Math.round(scored.reduce((s, e) => s + (e.productivityScore ?? 0), 0) / scored.length);
+    }, [data]);
+
     const updatedAt = data?.generatedAt
         ? new Date(data.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : null;
 
     return (
-        <div className="min-h-dvh bg-slate-950 text-slate-100">
+        <div className="min-h-dvh bg-black text-slate-100">
 
             {/* ── Header ───────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md lg:top-0">
+            <header className="sticky top-0 z-10 border-b border-white/5 bg-black/85 backdrop-blur-xl lg:top-0">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                         <h1 className="text-lg sm:text-2xl font-semibold text-white tracking-tight truncate">Admin Dashboard</h1>
@@ -151,7 +158,7 @@ export default function DashboardPage() {
                         id="btn-dashboard-refresh"
                         onClick={refetch}
                         disabled={loading}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400 hover:border-slate-700 hover:text-slate-200 transition-colors disabled:opacity-40"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/8 text-xs text-slate-400 hover:border-white/15 hover:text-slate-200 transition-colors disabled:opacity-40"
                         aria-label="Refresh dashboard"
                     >
                         <span className={loading ? 'animate-spin' : ''}><RefreshIcon /></span>
@@ -179,66 +186,69 @@ export default function DashboardPage() {
                         />
 
                         {/* ═══════════════════════════════════════════════════
-                            SECTION 2 — Team Health Strip
-                        ═══════════════════════════════════════════════════ */}
-                        <TeamHealthStrip data={data} />
-
-                        {/* ═══════════════════════════════════════════════════
-                            SECTION 3 — Actionable Employee List
+                            SECTION 2 — Actionable Employee List
                         ═══════════════════════════════════════════════════ */}
                         <section aria-label="Employee list">
-                            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                                        Employees
-                                    </h2>
-                                    {activeFilter && activeFilter !== ('none' as AttentionFilter) && (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                                            {FILTER_LABELS[activeFilter]}
+                            <div className="rounded-2xl bg-slate-900/40 p-4">
+                                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                                            Employees
+                                        </h2>
+                                        {activeFilter && activeFilter !== ('none' as AttentionFilter) && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-white/5 text-slate-300 border border-white/10">
+                                                {FILTER_LABELS[activeFilter]}
+                                                <button
+                                                    onClick={() => setActiveFilter(null)}
+                                                    className="ml-0.5 text-slate-500 hover:text-slate-200 transition-colors"
+                                                    aria-label="Clear filter"
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-xs text-slate-600">
+                                        {visibleEmployees.length} of {data.employeeStats.length} employees
+                                    </span>
+                                </div>
+
+                                {visibleEmployees.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-white/10 py-12 text-center">
+                                        <p className="text-slate-600 text-sm">
+                                            {activeFilter
+                                                ? 'No employees match this filter.'
+                                                : 'No employees found for this organisation.'}
+                                        </p>
+                                        {activeFilter && (
                                             <button
                                                 onClick={() => setActiveFilter(null)}
-                                                className="ml-0.5 text-slate-500 hover:text-slate-200 transition-colors"
-                                                aria-label="Clear filter"
+                                                className="mt-3 text-xs text-slate-500 hover:text-slate-300 underline transition-colors"
                                             >
-                                                ×
+                                                Clear filter
                                             </button>
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="text-xs text-slate-600">
-                                    {visibleEmployees.length} of {data.employeeStats.length} employees
-                                </span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {visibleEmployees.map(emp => (
+                                            <EmployeeCard
+                                                key={emp.employeeId}
+                                                emp={emp}
+                                                orgAvgScore={orgAvgScore}
+                                                onAssignTask={handleAssignTask}
+                                                onViewDetails={handleViewDetails}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-
-                            {visibleEmployees.length === 0 ? (
-                                <div className="rounded-xl border border-dashed border-slate-800 py-12 text-center">
-                                    <p className="text-slate-600 text-sm">
-                                        {activeFilter
-                                            ? 'No employees match this filter.'
-                                            : 'No employees found for this organisation.'}
-                                    </p>
-                                    {activeFilter && (
-                                        <button
-                                            onClick={() => setActiveFilter(null)}
-                                            className="mt-3 text-xs text-slate-500 hover:text-slate-300 underline transition-colors"
-                                        >
-                                            Clear filter
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {visibleEmployees.map(emp => (
-                                        <EmployeeCard
-                                            key={emp.employeeId}
-                                            emp={emp}
-                                            onAssignTask={handleAssignTask}
-                                            onViewDetails={handleViewDetails}
-                                        />
-                                    ))}
-                                </div>
-                            )}
                         </section>
+
+                        {/* ═══════════════════════════════════════════════════
+                            SECTION 3 — Team Health Strip
+                        ═══════════════════════════════════════════════════ */}
+                        <TeamHealthStrip data={data} />
 
                         {/* ── On-chain activity log (commented out — Web3 integration disabled) ──
                         {data.recentLogs.length > 0 && (

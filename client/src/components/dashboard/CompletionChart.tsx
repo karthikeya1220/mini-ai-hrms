@@ -21,7 +21,7 @@ function gradeColor(rate: number): string {
     const pct = rate * 100;
     if (pct >= 90) return '#34d399'; // emerald
     if (pct >= 80) return '#60a5fa'; // blue
-    if (pct >= 70) return '#818cf8'; // indigo (brand)
+    if (pct >= 70) return '#a3e635'; // lime-400 (brand)
     if (pct >= 60) return '#fbbf24'; // amber
     return '#f87171';                 // red
 }
@@ -37,7 +37,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
     const d = payload[0].payload;
 
     return (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm p-3 shadow-xl text-sm">
+        <div className="rounded-xl border border-white/8 bg-[#0f0f0f]/95 backdrop-blur-sm p-3 shadow-xl text-sm">
             <p className="font-semibold text-white mb-1">{d.name}</p>
             {d.jobTitle && <p className="text-slate-400 text-xs mb-2">{d.jobTitle}</p>}
             <div className="space-y-1">
