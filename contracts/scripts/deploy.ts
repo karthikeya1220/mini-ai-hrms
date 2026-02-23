@@ -166,22 +166,16 @@ async function main() {
     }
     console.log();
 
-    // ── 4. Post-deploy smoke test: register the deployer as the first org ─────
-    //    This confirms the contract is live and callable.
-    //    In production, each org self-registers using their own wallet key
-    //    via the backend API — the deployer wallet need not be an org at all.
-    console.log("Registering deployer as org (smoke test)…");
-    const regTx = await (contract as ethers.BaseContract & {
-        registerOrg(): Promise<ethers.ContractTransactionResponse>;
-        isRegistered(addr: string): Promise<boolean>;
-    }).registerOrg();
-    await regTx.wait(confirms);
-    const isReg = await (contract as ethers.BaseContract & {
-        isRegistered(addr: string): Promise<boolean>;
-    }).isRegistered(await deployer.getAddress());
+    // ── 4. Post-deploy smoke test: emit a TaskCompleted event ────────────────
+    //    Calls logTaskCompletion(0) to confirm the contract is live + callable.
+    //    Uses taskId=0 (a sentinel value — safe for smoke tests only).
+    console.log("Smoke test: calling logTaskCompletion(0)…");
+    const smokeTx = await (contract as ethers.BaseContract & {
+        logTaskCompletion(taskId: bigint): Promise<ethers.ContractTransactionResponse>;
+    }).logTaskCompletion(0n);
+    await smokeTx.wait(confirms);
 
-    console.log(`✓ registerOrg() → tx: ${regTx.hash}`);
-    console.log(`  isRegistered(deployer): ${isReg}`);
+    console.log(`✓ logTaskCompletion(0) → tx: ${smokeTx.hash}`);
     console.log();
 
     // ── 5. Output env-var block to copy-paste ──────────────────────────────────
