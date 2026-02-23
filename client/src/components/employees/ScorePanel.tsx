@@ -6,6 +6,7 @@ import { getEmployeeScore, getSkillGap } from '../../api/employees';
 import type { Employee, ProductivityScore, SkillGap } from '../../api/employees';
 import { Spinner } from '../ui';
 import { ScoreBadge } from '../dashboard/ScoreBadge';
+import { GeminiAnalysisPanel } from './GeminiAnalysisPanel';
 
 // ─── Radial score ring ────────────────────────────────────────────────────────
 
@@ -235,6 +236,12 @@ export function ScorePanel({ employee, onClose }: Props) {
 
                             {/* Skill Gaps */}
                             <SkillGapSection employeeId={employee.id} />
+
+                            {/* Gemini AI Analysis */}
+                            <GeminiAnalysisPanel
+                                employeeId={employee.id}
+                                employeeName={employee.name}
+                            />
 
                             {/* Meta + badge */}
                             <div className="pt-2 text-center text-xs text-slate-600">

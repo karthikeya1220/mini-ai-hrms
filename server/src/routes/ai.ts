@@ -30,6 +30,7 @@ import {
     recommendHandler,
     skillGapHandler,
 } from '../controllers/ai.controller';
+import { analyzeHandler } from '../controllers/gemini.controller';
 
 const router = Router();
 
@@ -55,6 +56,15 @@ router.get('/skill-gap/:employeeId',
     authMiddleware,
     authorizeOwnerOrAdmin('employeeId'),
     skillGapHandler,
+);
+
+// ── POST /api/ai/analyze ──────────────────────────────────────────────────────
+// Gemini-powered narrative analysis. Body: { type, employeeId }
+// ADMIN only — analysis may reveal cross-employee comparative data.
+router.post('/analyze',
+    authMiddleware,
+    authorize(['ADMIN']),
+    analyzeHandler,
 );
 
 export default router;

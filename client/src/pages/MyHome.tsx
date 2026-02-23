@@ -240,20 +240,22 @@ export default function MyHome() {
     const [perfLoading, setPerfLoading] = useState(false);
     const [perfError,   setPerfError]   = useState<string | null>(null);
 
-    // Only fetch once when user id is known
+    // Only fetch once when employeeId is known
+    // user.id  = User UUID (auth identity) — NOT what the AI routes expect
+    // user.employeeId = Employee UUID — matches :employeeId in /api/ai/score/:employeeId
     const fetchedRef = useRef(false);
     useEffect(() => {
-        if (!user?.id || fetchedRef.current) return;
+        if (!user?.employeeId || fetchedRef.current) return;
         fetchedRef.current = true;
         setPerfLoading(true);
         Promise.all([
-            getEmployeeScore(user.id),
-            getSkillGap(user.id),
+            getEmployeeScore(user.employeeId),
+            getSkillGap(user.employeeId),
         ])
             .then(([s, g]) => { setScore(s); setSkillGap(g); })
             .catch(e => setPerfError(e instanceof Error ? e.message : 'Failed to load performance data'))
             .finally(() => setPerfLoading(false));
-    }, [user?.id]);
+    }, [user?.employeeId]);
 
     // ── Sorted task list ──────────────────────────────────────────────────────
     const sortedTasks = useMemo(() => {
@@ -342,11 +344,17 @@ export default function MyHome() {
                     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 animate-pulse h-48" />
                 )}
 
-                {!perfLoading && perfError && (
+                {!perfLoading && !user?.employeeId && (
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-500">
+                        Your account is not linked to an employee profile yet. Contact your admin.
+                    </div>
+                )}
+
+                {!perfLoading && !!user?.employeeId && perfError && (
                     <p className="text-sm text-red-400 px-1">{perfError}</p>
                 )}
 
-                {!perfLoading && !perfError && (
+                {!perfLoading && !!user?.employeeId && !perfError && (
 
                     <div className="space-y-4">
 
