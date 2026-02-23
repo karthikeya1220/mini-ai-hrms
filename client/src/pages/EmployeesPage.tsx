@@ -214,27 +214,28 @@ export default function EmployeesPage() {
         <div className="min-h-dvh bg-slate-950 text-slate-100">
             {/* ── Page Header ────────────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                    <h1 className="text-2xl font-semibold text-white">Employees</h1>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+                    <h1 className="text-base sm:text-xl font-semibold text-white truncate">Employees</h1>
                     <button
                         id="btn-add-employee"
                         onClick={() => { setSelected(null); setModal('add'); }}
-                        className="btn-primary text-sm gap-2"
+                        className="btn-primary text-xs sm:text-sm gap-1.5 flex-shrink-0"
                     >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
-                        Add employee
+                        <span className="hidden xs:inline">Add employee</span>
+                        <span className="xs:hidden">Add</span>
                     </button>
                 </div>
             </header>
 
             {/* ── Main ─────────────────────────────────────────────────────────────── */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-5 sm:space-y-6 pb-10">
                 {/* Page heading */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-semibold text-white tracking-tight">Employees</h1>
+                        <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">Employees</h1>
                         <p className="text-sm text-slate-500 mt-1">
                             {total} total · {employees.filter(e => e.isActive).length} active
                         </p>

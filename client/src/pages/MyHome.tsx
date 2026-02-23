@@ -124,7 +124,7 @@ function TrendBadge({ trend }: { trend: ProductivityScore['trend'] }) {
 
 function StatPill({ label, value }: { label: string; value: string }) {
     return (
-        <div className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 min-w-[90px]">
+        <div className="flex flex-col items-center gap-0.5 px-3 sm:px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 min-w-[72px] sm:min-w-[90px] flex-1 sm:flex-none">
             <span className="text-base font-bold text-white tabular-nums">{value}</span>
             <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
         </div>
@@ -145,10 +145,10 @@ function WorkSummary({ tasks }: WorkSummaryProps) {
         .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())[0];
 
     return (
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex flex-wrap gap-2 sm:gap-3 items-stretch">
             <StatPill label="Active" value={String(active.length)} />
             <StatPill label="Overdue" value={String(overdue.length)} />
-            <div className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700">
+            <div className="flex flex-col gap-0.5 px-3 sm:px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 flex-1 sm:flex-none">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wide">Next due</span>
                 <span className={`text-sm font-semibold tabular-nums ${upcoming ? dueDateColor(upcoming.dueDate) : 'text-slate-600'}`}>
                     {upcoming ? fmtDate(upcoming.dueDate) : 'None'}
@@ -353,11 +353,11 @@ export default function MyHome() {
     const bd = score?.breakdown;
 
     return (
-        <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-10">
+        <div className="px-4 sm:px-6 py-5 sm:py-8 max-w-3xl mx-auto space-y-8 sm:space-y-10 pb-10">
 
             {/* ── Header ─────────────────────────────────────────────────────── */}
             <header>
-                <h1 className="text-2xl font-semibold text-white tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
                     My Home
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">

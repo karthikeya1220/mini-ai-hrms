@@ -137,10 +137,10 @@ export default function DashboardPage() {
         <div className="min-h-dvh bg-slate-950 text-slate-100">
 
             {/* ── Header ───────────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md lg:top-0">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                        <h1 className="text-2xl font-semibold text-white tracking-tight truncate">Admin Dashboard</h1>
+                        <h1 className="text-lg sm:text-2xl font-semibold text-white tracking-tight truncate">Admin Dashboard</h1>
                         {updatedAt && (
                             <span className="hidden sm:inline text-xs text-slate-600">
                                 · updated {updatedAt}
@@ -161,7 +161,7 @@ export default function DashboardPage() {
             </header>
 
             {/* ── Main ─────────────────────────────────────────────────────── */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-6 sm:space-y-8 pb-10">
 
                 {loading && !data ? (
                     <DashboardSkeleton />

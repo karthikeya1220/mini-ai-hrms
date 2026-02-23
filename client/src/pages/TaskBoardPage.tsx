@@ -230,10 +230,10 @@ export default function TaskBoardPage() {
         <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col">
             {/* ── Page Header ───────────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    <h1 className="text-xl font-semibold text-white">Task Board</h1>
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+                    <h1 className="text-base sm:text-xl font-semibold text-white flex-shrink-0">Task Board</h1>
                     <div className="flex items-center gap-2">
-                        {/* Search */}
+                        {/* Search — hidden on xs, shown sm+ */}
                         <div className="relative hidden sm:block">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -244,7 +244,7 @@ export default function TaskBoardPage() {
                                 placeholder="Search tasks…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/70 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 w-44 transition-all"
+                                className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/70 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 w-36 md:w-44 transition-all"
                             />
                         </div>
 
@@ -268,7 +268,8 @@ export default function TaskBoardPage() {
                                 className="btn-primary text-xs gap-1.5 py-1.5"
                             >
                                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                                <span>New task</span>
+                                <span className="hidden xs:inline">New task</span>
+                                <span className="xs:hidden">New</span>
                             </button>
                         )}
                     </div>
@@ -276,20 +277,20 @@ export default function TaskBoardPage() {
             </header>
 
             {/* Sub-header: board title + on-chain indicator + priority filters */}
-            <div className="border-b border-slate-900 bg-slate-950/90 backdrop-blur-md sticky top-16 z-10">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-600">
+            <div className="border-b border-slate-900 bg-slate-950/90 backdrop-blur-md sticky top-14 z-10">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4 overflow-x-auto scrollbar-none">
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-xs text-slate-600 whitespace-nowrap">
                             {filteredTasks.length} of {total} task{total !== 1 ? 's' : ''}
                         </span>
                         {account && (
-                            <span className="flex items-center gap-1 text-[10px] text-violet-400/70 border border-violet-500/20 bg-violet-500/5 rounded-full px-2 py-0.5">
+                            <span className="flex items-center gap-1 text-[10px] text-violet-400/70 border border-violet-500/20 bg-violet-500/5 rounded-full px-2 py-0.5 whitespace-nowrap">
                                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                                On-chain logging active
+                                On-chain active
                             </span>
                         )}
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-shrink-0">
                         {PRIORITY_FILTERS.map(f => (
                             <PriorityPill
                                 key={f.val}
@@ -313,8 +314,9 @@ export default function TaskBoardPage() {
             )}
 
             {/* ── Kanban board ──────────────────────────────────────────────────── */}
-            <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start h-full">
+            <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-5 pb-10 overflow-x-auto">
+                {/* On mobile: horizontal scroll with min-width cards; on md+: 3-col grid */}
+                <div className="flex gap-4 md:grid md:grid-cols-3 md:gap-4 items-start min-w-[640px] md:min-w-0 h-full">
                     {COLUMNS.map(status => {
                         const columnTasks = tasksByStatus(status);
                         return (

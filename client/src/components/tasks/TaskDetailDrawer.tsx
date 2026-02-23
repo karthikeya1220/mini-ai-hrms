@@ -176,17 +176,17 @@ export function TaskDetailDrawer({
                 aria-hidden="true"
             />
 
-            {/* Drawer panel */}
+            {/* Drawer panel — bottom sheet on mobile, right panel on md+ */}
             <aside
                 role="dialog"
                 aria-modal
                 aria-label={`Task detail: ${task.title}`}
                 className="
-                    fixed inset-y-0 right-0 z-50
-                    w-full max-w-md
-                    flex flex-col
-                    bg-slate-900 border-l border-slate-800
-                    shadow-2xl
+                    fixed z-50 flex flex-col bg-slate-900 shadow-2xl
+                    inset-x-0 bottom-0 rounded-t-2xl border-t border-slate-800 h-[90dvh]
+                    md:inset-y-0 md:right-0 md:left-auto md:bottom-auto
+                    md:h-full md:w-full md:max-w-md
+                    md:border-l md:border-t-0 md:rounded-none
                 "
                 style={{ animation: 'slideInRight 0.22s ease both' }}
             >

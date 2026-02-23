@@ -153,7 +153,7 @@ export default function LoginPage() {
           <button
             id="btn-login-submit"
             type="submit"
-            className="btn-primary mt-2"
+            className="btn-primary w-full mt-2"
             disabled={loading}
           >
             {loading ? (
