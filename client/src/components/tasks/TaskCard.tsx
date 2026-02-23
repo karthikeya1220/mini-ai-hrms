@@ -2,9 +2,12 @@
 // Draggable Kanban card — drag-and-drop via HTML5 DnD API (no library).
 // Also has a dropdown status control for keyboard/touch users.
 
-import { useRef } from 'react';
-import type { Task, TaskStatus } from '../../api/tasks';
-import { NEXT_STATUS } from '../../api/tasks';
+import { useRef, useState } from 'react';
+import type { Task, TaskStatus, Recommendation } from '../../api/tasks';
+import { NEXT_STATUS, recommendEmployees } from '../../api/tasks';
+import { useAuth } from '../../context/AuthContext';
+import { Spinner } from '../ui';
+import { ScoreBadge } from '../dashboard/ScoreBadge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,8 +119,34 @@ export interface TaskCardProps {
 export function TaskCard({
     task, assigneeName, onMove, moving, onDragStart, onDragEnd,
 }: TaskCardProps) {
+    const { isAdmin } = useAuth();
     const cardRef = useRef<HTMLDivElement>(null);
     const p = PRIORITY_META[task.priority] ?? PRIORITY_META.medium;
+
+    // AI recommendation state
+    const [recs, setRecs] = useState<Recommendation[] | null>(null);
+    const [loadingRecs, setLoadingRecs] = useState(false);
+    const [showRecs, setShowRecs] = useState(false);
+
+    async function handleGetRecommendations() {
+        if (showRecs) {
+            setShowRecs(false);
+            return;
+        }
+        setShowRecs(true);
+        if (recs) return; // already fetched
+
+        setLoadingRecs(true);
+        try {
+            const data = await recommendEmployees(task.id);
+            setRecs(data);
+        } catch (err) {
+            console.error('Failed to fetch recommendations:', err);
+            setShowRecs(false);
+        } finally {
+            setLoadingRecs(false);
+        }
+    }
 
     return (
         <div
@@ -152,13 +181,69 @@ export function TaskCard({
                         title="On-chain verified"
                         onClick={e => e.stopPropagation()}
                     >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg>
                     </a>
                 )}
+
+                {/* AI Recommendation Trigger */}
+                {isAdmin && task.status !== 'completed' && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleGetRecommendations(); }}
+                        className={`ml-1 p-1 rounded-md transition-all ${showRecs ? 'bg-brand-500/20 text-brand-400' : 'text-slate-700 hover:text-brand-500 hover:bg-slate-800'}`}
+                        title="AI Smart Assignment"
+                    >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
+                            <polyline points="7.5 19.79 7.5 14.63 3 12" />
+                            <polyline points="21 12 16.5 14.63 16.5 19.79" />
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                        </svg>
+                    </button>
+                )}
             </div>
+
+            {/* AI Recommendation Panel */}
+            {showRecs && (
+                <div className="mx-4 mt-2 p-3 rounded-xl bg-slate-800/40 border border-brand-500/20 space-y-3 animate-fade-in divide-y divide-slate-800">
+                    <div className="flex justify-between items-center pb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">AI Recommendations</span>
+                        {loadingRecs && <Spinner className="w-3 h-3 opacity-50" />}
+                    </div>
+
+                    {!loadingRecs && recs && recs.length === 0 && (
+                        <p className="text-[10px] text-slate-500 pt-2">No suitable candidates found.</p>
+                    )}
+
+                    {!loadingRecs && recs && recs.map((r) => (
+                        <div key={r.employee.id} className="pt-2 flex items-center justify-between group/rec">
+                            <div className="flex items-center gap-2">
+                                <MiniAvatar name={r.employee.name} />
+                                <div>
+                                    <p className="text-[11px] font-semibold text-slate-200">{r.employee.name}</p>
+                                    <p className="text-[9px] text-slate-500">{r.employee.role ?? 'Employee'}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="flex items-center gap-1.5 justify-end">
+                                    <span className="text-[9px] text-slate-600">Overlap: {r.reasoning.skillOverlap}</span>
+                                    <ScoreBadge rate={r.reasoning.perfScore / 100} size="sm" />
+                                </div>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // This is a "recommendation" only, matching should be done by the user
+                                        // But we can hint that they should assign it to this person.
+                                    }}
+                                    className="text-[9px] text-brand-400 hover:text-brand-300 font-medium transition-colors"
+                                >
+                                    Best Match #{r.rank}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Description preview */}
             {task.description && (

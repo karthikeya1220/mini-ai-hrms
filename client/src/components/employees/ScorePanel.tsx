@@ -2,8 +2,8 @@
 // Slide-out panel showing an employee's AI productivity score and breakdown.
 
 import { useState, useEffect } from 'react';
-import { getEmployeeScore } from '../../api/employees';
-import type { Employee, ProductivityScore } from '../../api/employees';
+import { getEmployeeScore, getSkillGap } from '../../api/employees';
+import type { Employee, ProductivityScore, SkillGap } from '../../api/employees';
 import { Spinner } from '../ui';
 import { ScoreBadge } from '../dashboard/ScoreBadge';
 
@@ -65,6 +65,61 @@ function BreakdownBar({ label, value, max = 1 }: { label: string; value: number;
                 />
             </div>
         </div>
+    );
+}
+
+// ─── Skill gap section ────────────────────────────────────────────────────────
+
+function SkillGapSection({ employeeId }: { employeeId: string }) {
+    const [gap, setGap] = useState<SkillGap | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const t = setTimeout(() => {
+            if (!cancelled) setLoading(true);
+        }, 0);
+
+        getSkillGap(employeeId)
+            .then(data => { if (!cancelled) setGap(data); })
+            .catch(() => { if (!cancelled) setGap(null); })
+            .finally(() => { if (!cancelled) { clearTimeout(t); setLoading(false); } });
+
+        return () => { cancelled = true; clearTimeout(t); };
+    }, [employeeId]);
+
+    if (loading) return <div className="h-20 flex items-center justify-center"><Spinner className="w-5 h-5 opacity-40" /></div>;
+    if (!gap || gap.requiredSkills.length === 0) return null;
+
+    return (
+        <section className="rounded-xl border border-slate-800 bg-slate-800/20 p-4 space-y-3">
+            <div className="flex justify-between items-center">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Skill Gap Analysis</h3>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                    {Math.round(gap.coverageRate * 100)}% Coverage
+                </span>
+            </div>
+
+            {gap.gapSkills.length > 0 ? (
+                <div className="space-y-2">
+                    <p className="text-[11px] text-slate-400">Missing skills required for current role:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {gap.gapSkills.map(s => (
+                            <span key={s} className="px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-[10px] font-medium text-red-400">
+                                {s}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="flex items-center gap-2 text-[11px] text-emerald-400">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Skills fully aligned with role requirements
+                </div>
+            )}
+        </section>
     );
 }
 
@@ -177,6 +232,9 @@ export function ScorePanel({ employee, onClose }: Props) {
                                 </div>
                             </section>
                             )}
+
+                            {/* Skill Gaps */}
+                            <SkillGapSection employeeId={employee.id} />
 
                             {/* Meta + badge */}
                             <div className="pt-2 text-center text-xs text-slate-600">

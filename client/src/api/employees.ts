@@ -57,6 +57,15 @@ export interface ProductivityScore {
     computedAt: string;            // ISO
 }
 
+export interface SkillGap {
+    employeeId: string;
+    name: string;
+    currentSkills: string[];
+    requiredSkills: string[];
+    gapSkills: string[];
+    coverageRate: number;     // 0-1
+}
+
 // ─── Employee CRUD ────────────────────────────────────────────────────────────
 
 export interface ListParams {
@@ -100,5 +109,11 @@ export async function deactivateEmployee(id: string): Promise<Employee> {
 /** GET /api/ai/score/:employeeId */
 export async function getEmployeeScore(employeeId: string): Promise<ProductivityScore> {
     const res = await client.get<{ success: true; data: ProductivityScore }>(`/ai/score/${employeeId}`);
+    return res.data.data;
+}
+
+/** GET /api/ai/skill-gap/:employeeId */
+export async function getSkillGap(employeeId: string): Promise<SkillGap> {
+    const res = await client.get<{ success: true; data: SkillGap }>(`/ai/skill-gap/${employeeId}`);
     return res.data.data;
 }

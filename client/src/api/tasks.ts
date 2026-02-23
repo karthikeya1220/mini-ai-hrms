@@ -85,3 +85,28 @@ export async function updateTaskStatus(id: string, status: TaskStatus): Promise<
     const res = await client.put<{ success: true; data: Task }>(`/tasks/${id}/status`, { status });
     return res.data.data;
 }
+
+// ─── AI recommendations ───────────────────────────────────────────────────────
+
+export interface Recommendation {
+    rank: number;
+    score: number;
+    employee: {
+        id: string;
+        name: string;
+        role: string | null;
+        department: string | null;
+        skills: string[];
+    };
+    reasoning: {
+        skillOverlap: number;
+        activeCount: number;
+        perfScore: number;
+    };
+}
+
+/** GET /api/ai/recommend/:taskId */
+export async function recommendEmployees(taskId: string): Promise<Recommendation[]> {
+    const res = await client.get<{ success: true; data: { recommendations: Recommendation[] } }>(`/ai/recommend/${taskId}`);
+    return res.data.data.recommendations;
+}
