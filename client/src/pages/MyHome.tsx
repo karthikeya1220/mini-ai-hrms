@@ -1,0 +1,444 @@
+// =============================================================================
+// pages/MyHome.tsx — Employee Home (/my)
+//
+// SECTION 1 — My Work
+//   • Work-summary strip: active tasks, overdue tasks, next due date
+//   • My Tasks list (not Kanban) — clickable rows open TaskDetailDrawer
+//
+// SECTION 2 — My Performance
+//   • Productivity Score Ring + grade
+//   • Completion / on-time / avg complexity stats
+//   • Skill-gap chip panel
+//   • Trend indicator
+//
+// Data sources (no new endpoints):
+//   • GET /api/tasks           — auto-filtered by role on server
+//   • GET /api/ai/score/:id    — via getEmployeeScore
+//   • GET /api/ai/skill-gap/:id — via getSkillGap
+// =============================================================================
+
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useTasks } from '../hooks/useTasks';
+import { getEmployeeScore, getSkillGap } from '../api/employees';
+import type { ProductivityScore, SkillGap } from '../api/employees';
+import type { Task, TaskStatus } from '../api/tasks';
+import { updateTaskStatus } from '../api/tasks';
+import { TaskDetailDrawer } from '../components/tasks/TaskDetailDrawer';
+import toast from 'react-hot-toast';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const PRIORITY_DOT: Record<string, string> = {
+    low:    'bg-slate-500',
+    medium: 'bg-amber-500',
+    high:   'bg-red-500',
+};
+
+const STATUS_LABEL: Record<TaskStatus, string> = {
+    assigned:    'Assigned',
+    in_progress: 'In Progress',
+    completed:   'Completed',
+};
+
+function fmtDate(iso: string | null): string {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function dueDateColor(iso: string | null): string {
+    if (!iso) return 'text-slate-500';
+    const diff = new Date(iso).getTime() - Date.now();
+    if (diff < 0)              return 'text-red-400';
+    if (diff < 86_400_000 * 2) return 'text-amber-400';
+    return 'text-slate-400';
+}
+
+// ─── Score Ring ───────────────────────────────────────────────────────────────
+
+function scoreColor(score: number | null): string {
+    if (score === null) return '#64748b';
+    if (score >= 90)    return '#10b981';
+    if (score >= 80)    return '#3b82f6';
+    if (score >= 70)    return '#6366f1';
+    if (score >= 60)    return '#f59e0b';
+    return '#ef4444';
+}
+
+function ScoreRing({ score }: { score: number | null }) {
+    const size = 96;
+    const stroke = 7;
+    const r = (size - stroke) / 2;
+    const circ = 2 * Math.PI * r;
+    const pct = score ?? 0;
+    const dash = (pct / 100) * circ;
+    const color = scoreColor(score);
+
+    return (
+        <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
+                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#1e293b" strokeWidth={stroke} />
+                <circle
+                    cx={size / 2} cy={size / 2} r={r}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={`${dash} ${circ}`}
+                    style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-xl font-extrabold text-white tabular-nums leading-none"
+                    style={{ color }}
+                >
+                    {score !== null ? Math.round(score) : '—'}
+                </span>
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">score</span>
+            </div>
+        </div>
+    );
+}
+
+// ─── Trend badge ──────────────────────────────────────────────────────────────
+
+const TREND_META: Record<string, { label: string; arrow: string; color: string }> = {
+    improving:        { label: 'Improving',        arrow: '↑', color: 'text-emerald-400' },
+    declining:        { label: 'Declining',         arrow: '↓', color: 'text-red-400'     },
+    stable:           { label: 'Stable',            arrow: '→', color: 'text-slate-400'   },
+    insufficient_data:{ label: 'Not enough data',   arrow: '·', color: 'text-slate-600'   },
+};
+
+function TrendBadge({ trend }: { trend: ProductivityScore['trend'] }) {
+    const meta = TREND_META[trend] ?? TREND_META.insufficient_data;
+    return (
+        <span className={`text-xs font-medium ${meta.color}`}>
+            {meta.arrow} {meta.label}
+        </span>
+    );
+}
+
+// ─── Stat pill ────────────────────────────────────────────────────────────────
+
+function StatPill({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700/50 min-w-[90px]">
+            <span className="text-base font-bold text-white tabular-nums">{value}</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
+        </div>
+    );
+}
+
+// ─── Work Summary Strip ───────────────────────────────────────────────────────
+
+interface WorkSummaryProps {
+    tasks: Task[];
+}
+
+function WorkSummary({ tasks }: WorkSummaryProps) {
+    const active   = tasks.filter(t => t.status !== 'completed');
+    const overdue  = active.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
+    const upcoming = active
+        .filter(t => t.dueDate)
+        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())[0];
+
+    return (
+        <div className="flex flex-wrap gap-3 items-center">
+            <StatPill label="Active" value={String(active.length)} />
+            <StatPill label="Overdue" value={String(overdue.length)} />
+            <div className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wide">Next due</span>
+                <span className={`text-sm font-semibold tabular-nums ${upcoming ? dueDateColor(upcoming.dueDate) : 'text-slate-600'}`}>
+                    {upcoming ? fmtDate(upcoming.dueDate) : 'None'}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+// ─── Task Row ─────────────────────────────────────────────────────────────────
+
+interface TaskRowProps {
+    task: Task;
+    onClick: (id: string) => void;
+}
+
+function TaskRow({ task, onClick }: TaskRowProps) {
+    return (
+        <button
+            type="button"
+            onClick={() => onClick(task.id)}
+            className="
+                w-full flex items-center gap-3 px-4 py-3
+                rounded-xl border border-slate-800 bg-slate-900
+                hover:border-slate-700 hover:bg-slate-800/60
+                transition-colors text-left
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500
+            "
+        >
+            {/* Priority dot */}
+            <span
+                className={`flex-shrink-0 w-2 h-2 rounded-full ${PRIORITY_DOT[task.priority] ?? PRIORITY_DOT.medium}`}
+                aria-label={`Priority: ${task.priority}`}
+            />
+
+            {/* Title */}
+            <span className="flex-1 min-w-0 text-sm font-medium text-slate-200 truncate">
+                {task.title}
+            </span>
+
+            {/* Status */}
+            <span className="flex-shrink-0 text-xs text-slate-500 hidden sm:block">
+                {STATUS_LABEL[task.status]}
+            </span>
+
+            {/* Due date */}
+            <span className={`flex-shrink-0 text-xs tabular-nums ${dueDateColor(task.dueDate)}`}>
+                {fmtDate(task.dueDate)}
+            </span>
+
+            {/* Chevron */}
+            <svg className="flex-shrink-0 w-4 h-4 text-slate-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+        </button>
+    );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function MyHome() {
+    const { user } = useAuth();
+
+    // ── Task state ────────────────────────────────────────────────────────────
+    const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
+
+    // ── Drawer overlay ────────────────────────────────────────────────────────
+    const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+    const [movingIds,    setMovingIds]    = useState<Set<string>>(new Set());
+
+    const openTask  = useCallback((id: string) => setActiveTaskId(id), []);
+    const closeTask = useCallback(() => setActiveTaskId(null), []);
+
+    // Optimistic move (no drag-and-drop for employees — status changes only from drawer)
+    const handleMove = useCallback(async (id: string, status: TaskStatus) => {
+        setMovingIds(prev => new Set(prev).add(id));
+        try {
+            await updateTaskStatus(id, status);
+            // useTasks re-fetches on next render cycle — trigger via refetch if needed
+            toast.success('Status updated');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to update status');
+        } finally {
+            setMovingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+        }
+    }, []);
+
+    // ── Performance state ─────────────────────────────────────────────────────
+    const [score,    setScore]    = useState<ProductivityScore | null>(null);
+    const [skillGap, setSkillGap] = useState<SkillGap | null>(null);
+    const [perfLoading, setPerfLoading] = useState(false);
+    const [perfError,   setPerfError]   = useState<string | null>(null);
+
+    // Only fetch once when user id is known
+    const fetchedRef = useRef(false);
+    useEffect(() => {
+        if (!user?.id || fetchedRef.current) return;
+        fetchedRef.current = true;
+        setPerfLoading(true);
+        Promise.all([
+            getEmployeeScore(user.id),
+            getSkillGap(user.id),
+        ])
+            .then(([s, g]) => { setScore(s); setSkillGap(g); })
+            .catch(e => setPerfError(e instanceof Error ? e.message : 'Failed to load performance data'))
+            .finally(() => setPerfLoading(false));
+    }, [user?.id]);
+
+    // ── Sorted task list ──────────────────────────────────────────────────────
+    const sortedTasks = useMemo(() => {
+        // Active first, then by due date ascending, completed at bottom
+        return [...tasks].sort((a, b) => {
+            if (a.status === 'completed' && b.status !== 'completed') return 1;
+            if (a.status !== 'completed' && b.status === 'completed') return -1;
+            if (!a.dueDate && !b.dueDate) return 0;
+            if (!a.dueDate) return 1;
+            if (!b.dueDate) return -1;
+            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        });
+    }, [tasks]);
+
+    // ── Active task for drawer ────────────────────────────────────────────────
+    const activeTask = activeTaskId ? tasks.find(t => t.id === activeTaskId) : undefined;
+
+    // ── Perf breakdown shorthands ─────────────────────────────────────────────
+    const bd = score?.breakdown;
+
+    return (
+        <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-10">
+
+            {/* ── Header ─────────────────────────────────────────────────────── */}
+            <header>
+                <h1 className="text-2xl font-bold text-white tracking-tight">
+                    My Home
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                    Welcome back, {user?.name ?? user?.email}
+                </p>
+            </header>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                SECTION 1 — MY WORK
+            ══════════════════════════════════════════════════════════════════ */}
+            <section aria-labelledby="my-work-heading">
+                <h2 id="my-work-heading" className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
+                    My Work
+                </h2>
+
+                {/* Work summary strip */}
+                {tasksLoading ? (
+                    <div className="flex gap-3">
+                        {[1,2,3].map(i => (
+                            <div key={i} className="h-16 w-24 rounded-xl bg-slate-800 animate-pulse" />
+                        ))}
+                    </div>
+                ) : (
+                    <WorkSummary tasks={tasks} />
+                )}
+
+                {/* Task list */}
+                <div className="mt-5 space-y-2">
+                    {tasksLoading && (
+                        <div className="space-y-2">
+                            {[1,2,3,4].map(i => (
+                                <div key={i} className="h-12 rounded-xl bg-slate-800 animate-pulse" />
+                            ))}
+                        </div>
+                    )}
+
+                    {!tasksLoading && tasksError && (
+                        <p className="text-sm text-red-400 px-1">{tasksError}</p>
+                    )}
+
+                    {!tasksLoading && !tasksError && sortedTasks.length === 0 && (
+                        <p className="text-sm text-slate-600 px-1">No tasks assigned yet.</p>
+                    )}
+
+                    {!tasksLoading && !tasksError && sortedTasks.map(task => (
+                        <TaskRow key={task.id} task={task} onClick={openTask} />
+                    ))}
+                </div>
+            </section>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                SECTION 2 — MY PERFORMANCE
+            ══════════════════════════════════════════════════════════════════ */}
+            <section aria-labelledby="my-perf-heading">
+                <h2 id="my-perf-heading" className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
+                    My Performance
+                </h2>
+
+                {perfLoading && (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 animate-pulse h-48" />
+                )}
+
+                {!perfLoading && perfError && (
+                    <p className="text-sm text-red-400 px-1">{perfError}</p>
+                )}
+
+                {!perfLoading && !perfError && (
+
+                    <div className="space-y-4">
+
+                        {/* ── Performance Card ──────────────────────────────── */}
+                        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                            <div className="flex items-center gap-6 flex-wrap">
+
+                                {/* Score Ring */}
+                                <ScoreRing score={score?.score ?? null} />
+
+                                {/* Stats */}
+                                <div className="flex-1 min-w-0 space-y-3">
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <span className="text-sm font-semibold text-slate-300">
+                                            {score?.grade ? `Grade ${score.grade}` : 'No grade yet'}
+                                        </span>
+                                        {score && <TrendBadge trend={score.trend} />}
+                                    </div>
+
+                                    {bd ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            <StatPill
+                                                label="Completion"
+                                                value={`${Math.round(bd.completionRate * 100)}%`}
+                                            />
+                                            <StatPill
+                                                label="On-time"
+                                                value={`${Math.round(bd.onTimeRate * 100)}%`}
+                                            />
+                                            <StatPill
+                                                label="Avg complexity"
+                                                value={bd.avgComplexity > 0 ? bd.avgComplexity.toFixed(1) : '—'}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-600">
+                                            Complete some tasks to see your breakdown.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Skill Gap Panel ───────────────────────────────── */}
+                        {skillGap && (
+                            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                                    Skill Gap
+                                </p>
+                                <p className="text-xs text-slate-600 mb-3">
+                                    Skills to improve for upcoming tasks
+                                </p>
+
+                                {skillGap.gapSkills.length === 0 ? (
+                                    <p className="text-xs text-emerald-400">
+                                        ✓ You have all the skills required for your current tasks.
+                                    </p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        {skillGap.gapSkills.map(skill => (
+                                            <span
+                                                key={skill}
+                                                className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-300"
+                                            >
+                                                {skill}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {skillGap.gapSkills.length > 0 && (
+                                    <p className="mt-3 text-[10px] text-slate-600">
+                                        Coverage: {Math.round(skillGap.coverageRate * 100)}% of required skills covered
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                    </div>
+                )}
+            </section>
+
+            {/* ── Task Detail Drawer ──────────────────────────────────────────── */}
+            {activeTask && (
+                <TaskDetailDrawer
+                    task={activeTask}
+                    assignee={undefined}      /* employees don't need to see assignee info */
+                    onClose={closeTask}
+                    onMove={handleMove}
+                    moving={movingIds.has(activeTask.id)}
+                />
+            )}
+        </div>
+    );
+}

@@ -13,14 +13,15 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EmployeesPage from './pages/EmployeesPage';
 import TaskBoardPage from './pages/TaskBoardPage';
+import InsightsPage from './pages/InsightsPage';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { EmployeeLayout } from './components/layout/EmployeeLayout';
-import MyPerformancePage from './pages/MyPerformancePage';
+import MyHome from './pages/MyHome';
 
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from /login and /register.
 function GuestRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isAdmin, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -31,7 +32,7 @@ function GuestRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={isAdmin ? '/dashboard' : '/my'} replace />;
   }
 
   return <Outlet />;
@@ -62,16 +63,16 @@ function AppRouter() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/tasks" element={<TaskBoardPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
           </Route>
         </Route>
 
-        {/* Employee Routes (Non-admins redirected to /my) */}
-        {!isAdmin && (
-          <Route element={<EmployeeLayout />}>
-            <Route path="/my" element={<MyPerformancePage />} />
-            <Route path="/tasks" element={<TaskBoardPage />} />
+        {/* Employee Routes — /my is for employees; admins are redirected to /dashboard */}
+        <Route element={<EmployeeLayout />}>
+          <Route element={<ProtectedRoute requireEmployee />}>
+            <Route path="/my" element={<MyHome />} />
           </Route>
-        )}
+        </Route>
       </Route>
 
       {/* 404 fallback */}

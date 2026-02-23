@@ -32,9 +32,11 @@ function AuthSpinner() {
 interface ProtectedRouteProps {
     /** When true, only ADMIN users may access the nested routes. */
     requireAdmin?: boolean;
+    /** When true, only EMPLOYEE users may access the nested routes. */
+    requireEmployee?: boolean;
 }
 
-export function ProtectedRoute({ requireAdmin = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ requireAdmin = false, requireEmployee = false }: ProtectedRouteProps) {
     const { isAuthenticated, isAdmin, isLoading } = useAuth();
     const location = useLocation();
 
@@ -49,6 +51,11 @@ export function ProtectedRoute({ requireAdmin = false }: ProtectedRouteProps) {
     // Logged in but not an admin when admin is required → kick to /my.
     if (requireAdmin && !isAdmin) {
         return <Navigate to="/my" replace />;
+    }
+
+    // Logged in but is an admin when employee is required → kick to /dashboard.
+    if (requireEmployee && isAdmin) {
+        return <Navigate to="/dashboard" replace />;
     }
 
     return <Outlet />;

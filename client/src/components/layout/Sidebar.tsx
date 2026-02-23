@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useWeb3Context } from '../../context/Web3Context';
 
 interface SidebarProps {
     role: 'ADMIN' | 'EMPLOYEE';
@@ -7,6 +8,7 @@ interface SidebarProps {
 
 export function Sidebar({ role }: SidebarProps) {
     const { logout, user, org } = useAuth();
+    const { account, connect } = useWeb3Context();
     const isAdmin = role === 'ADMIN';
 
     const links = isAdmin
@@ -14,10 +16,10 @@ export function Sidebar({ role }: SidebarProps) {
             { to: '/dashboard', label: 'Dashboard', icon: '📊' },
             { to: '/employees', label: 'Employees', icon: '👤' },
             { to: '/tasks', label: 'Tasks', icon: '✅' },
+            { to: '/insights', label: 'Insights', icon: '🧠' },
         ]
         : [
-            { to: '/my', label: 'My Performance', icon: '📈' },
-            { to: '/tasks', label: 'Tasks', icon: '✅' },
+            { to: '/my', label: 'My Home', icon: '🏠' },
         ];
 
     return (
@@ -65,6 +67,28 @@ export function Sidebar({ role }: SidebarProps) {
                         <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
                     </div>
                 </div>
+
+                {/* Wallet — shown for employees when MetaMask is available */}
+                {!isAdmin && (
+                    <div className="mb-3">
+                        {account ? (
+                            <div className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/40">
+                                <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Wallet</p>
+                                <p className="text-[10px] font-mono text-emerald-400 truncate">
+                                    {account.slice(0, 6)}…{account.slice(-4)}
+                                </p>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={connect}
+                                className="w-full px-3 py-2 rounded-lg border border-slate-700 text-[10px] text-slate-500 hover:text-slate-300 hover:border-slate-600 transition-colors text-left"
+                            >
+                                🔗 Connect Wallet
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 <button
                     onClick={logout}
                     className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-neutral-800 transition-all border border-transparent"

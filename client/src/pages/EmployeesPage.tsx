@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useEmployees } from '../hooks/useEmployees';
 import type { Employee } from '../api/employees';
 import { EmployeeModal } from '../components/employees/EmployeeModal';
-import { ScorePanel } from '../components/employees/ScorePanel';
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -165,12 +165,11 @@ export default function EmployeesPage() {
     const { employees, total, loading, error, refetch, addEmployee, editEmployee, removeEmployee } =
         useEmployees(apiParams);
 
-    // ── Panel state ────────────────────────────────────────────────────────────
     const [modal, setModal] = useState<'add' | 'edit' | null>(null);
     const [selected, setSelected] = useState<Employee | null>(null);
-    const [scoreTarget, setScoreTarget] = useState<Employee | null>(null);
     const [deactTarget, setDeactTarget] = useState<Employee | null>(null);
     const [deactLoading, setDeactLoading] = useState(false);
+    const navigate = useNavigate();
 
     // ── Client-side search filter ──────────────────────────────────────────────
     const filtered = deferredSearch
@@ -397,12 +396,12 @@ export default function EmployeesPage() {
                                                 {/* Actions */}
                                                 <td className="px-4 py-3.5 pr-6">
                                                     <div className="flex items-center gap-1 justify-end">
-                                                        {/* Score */}
+                                                {/* Insights */}
                                                         <button
                                                             id={`btn-score-${emp.id}`}
-                                                            onClick={() => setScoreTarget(emp)}
+                                                            onClick={() => navigate(`/insights?employeeId=${emp.id}`)}
                                                             className="p-1.5 rounded-lg text-slate-600 hover:text-brand-400 hover:bg-brand-500/10 transition-all"
-                                                            title="View AI productivity score"
+                                                            title="View AI insights"
                                                         >
                                                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -471,13 +470,6 @@ export default function EmployeesPage() {
                     initial={modal === 'edit' ? selected : null}
                     onSave={handleSave}
                     onClose={() => { setModal(null); setSelected(null); }}
-                />
-            )}
-
-            {scoreTarget && (
-                <ScorePanel
-                    employee={scoreTarget}
-                    onClose={() => setScoreTarget(null)}
                 />
             )}
 
