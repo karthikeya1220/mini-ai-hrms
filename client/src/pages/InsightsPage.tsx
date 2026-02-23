@@ -34,11 +34,11 @@ import { Spinner } from '../components/ui';
 
 function scoreColor(score: number | null): string {
     if (score === null) return '#64748b';
-    if (score >= 90)    return '#10b981';
-    if (score >= 80)    return '#3b82f6';
-    if (score >= 70)    return '#6366f1';
-    if (score >= 60)    return '#f59e0b';
-    return '#ef4444';
+    if (score >= 90)    return '#10b981'; /* emerald — A+ */
+    if (score >= 80)    return '#8b5cf6'; /* violet  — A  */
+    if (score >= 70)    return '#38bdf8'; /* sky     — B  */
+    if (score >= 60)    return '#f59e0b'; /* amber   — C  */
+    return '#ef4444';                     /* red     — D  */
 }
 
 function initials(name: string) {

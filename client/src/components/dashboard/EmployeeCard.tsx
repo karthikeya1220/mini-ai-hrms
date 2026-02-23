@@ -34,8 +34,8 @@ function scoreToMeta(score: number | null): {
         return { label: 'No data', color: '#475569', textColor: 'text-slate-500', trackColor: '#1e293b' };
     }
     if (score >= 90) return { label: 'Excellent', color: '#10b981', textColor: 'text-emerald-400', trackColor: '#064e3b' };
-    if (score >= 80) return { label: 'Great',     color: '#3b82f6', textColor: 'text-blue-400',    trackColor: '#1e3a5f' };
-    if (score >= 70) return { label: 'Good',      color: '#6366f1', textColor: 'text-indigo-400',  trackColor: '#1e1b4b' };
+    if (score >= 80) return { label: 'Great',     color: '#8b5cf6', textColor: 'text-violet-400',  trackColor: '#2e1065' };
+    if (score >= 70) return { label: 'Good',      color: '#38bdf8', textColor: 'text-sky-400',     trackColor: '#0c4a6e' };
     if (score >= 60) return { label: 'Fair',      color: '#f59e0b', textColor: 'text-amber-400',   trackColor: '#451a03' };
     return             { label: 'Low',      color: '#ef4444', textColor: 'text-red-400',     trackColor: '#450a0a' };
 }

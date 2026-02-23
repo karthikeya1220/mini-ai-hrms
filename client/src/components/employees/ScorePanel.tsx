@@ -16,10 +16,10 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
     const fill = (score / 100) * circ;
 
     const color =
-        score >= 90 ? '#34d399' :
-            score >= 80 ? '#60a5fa' :
-                score >= 70 ? '#818cf8' :
-                    score >= 60 ? '#fbbf24' : '#f87171';
+        score >= 90 ? '#10b981' :   /* emerald — A+ */
+            score >= 80 ? '#8b5cf6' :   /* violet  — A  */
+                score >= 70 ? '#38bdf8' :   /* sky     — B  */
+                    score >= 60 ? '#f59e0b' : '#ef4444'; /* amber C / red D */
 
     return (
         <div className="flex flex-col items-center gap-2">

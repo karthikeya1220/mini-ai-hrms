@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthProvider';
 import { Web3Provider } from './context/Web3Context';
 import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/routing';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -41,12 +42,16 @@ function GuestRoute() {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 function AppRouter() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
 
   return (
     <Routes>
-      {/* Root → dashboard (or login if not authed) */}
-      <Route path="/" element={<Navigate to={isAdmin ? "/dashboard" : "/my"} replace />} />
+      {/* Root → landing for guests, dashboard/home for authed users */}
+      <Route path="/" element={
+        isAuthenticated
+          ? <Navigate to={isAdmin ? '/dashboard' : '/my'} replace />
+          : <LandingPage />
+      } />
 
       {/* Guest-only — redirect to dashboard if already signed in */}
       <Route element={<GuestRoute />}>

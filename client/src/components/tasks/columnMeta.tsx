@@ -22,8 +22,8 @@ export const COLUMN_META: Record<
     },
     in_progress: {
         label: 'In Progress',
-        accent: 'border-blue-500',
-        badge: 'bg-blue-500/15 text-blue-400',
+        accent: 'border-indigo-500',
+        badge: 'bg-indigo-500/15 text-indigo-400',
         icon: (
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="23 4 23 10 17 10" />
