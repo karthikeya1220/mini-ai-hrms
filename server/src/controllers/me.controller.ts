@@ -15,22 +15,21 @@ import prisma from '../lib/prisma';
 export async function getMe(req: AuthRequest, res: Response): Promise<void> {
     const user = req.user!;
 
-    // Fetch org name directly — guaranteed to exist (FK from JWT's orgId).
-    const org = await (prisma.organization as any).findUnique({
-        where: { id: user.orgId },
-        select: { id: true, name: true },
-    });
-
-    // Fetch employee name only if this user has a linked Employee profile.
-    // ADMINs created at registration have employeeId = null — handle gracefully.
-    let employeeName = '';
-    if (user.employeeId) {
-        const employee = await (prisma.employee as any).findUnique({
-            where: { id: user.employeeId },
-            select: { name: true },
-        });
-        employeeName = employee?.name ?? '';
-    }
+    // Fire both queries in parallel — org fetch and employee fetch are independent.
+    // The employee query resolves to null immediately when employeeId is absent,
+    // so Promise.all never blocks on a no-op branch.
+    const [org, employee] = await Promise.all([
+        (prisma.organization as any).findUnique({
+            where:  { id: user.orgId },
+            select: { id: true, name: true },
+        }),
+        user.employeeId
+            ? (prisma.employee as any).findUnique({
+                  where:  { id: user.employeeId },
+                  select: { name: true },
+              })
+            : Promise.resolve(null),
+    ]);
 
     sendSuccess(res, {
         user: {
@@ -38,7 +37,7 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
             email:      user.email,
             role:       user.role,
             employeeId: user.employeeId,
-            name:       employeeName,
+            name:       (employee as { name: string } | null)?.name ?? '',
         },
         org: org ?? { id: user.orgId, name: 'Workspace' },
     });

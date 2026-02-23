@@ -14,6 +14,23 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 export function createApp(): Express {
     const app = express();
 
+    // ── Proxy trust ───────────────────────────────────────────────────────────
+    // MUST be set before any middleware that reads req.ip (CORS, rate limiter).
+    //
+    // Without this, Express uses the load-balancer's IP for req.ip instead of
+    // the real client IP.  The auth rate limiter keys by req.ip, so all clients
+    // would share one bucket — one user's 10 requests would block everyone else,
+    // and an attacker behind the same proxy would be unlimited.
+    //
+    // `1` means trust exactly one hop of X-Forwarded-For (the outermost proxy).
+    // Increase to 2 if there are two layers (e.g. CDN → load-balancer → app).
+    // Set to a specific IP/CIDR string (e.g. '10.0.0.0/8') to trust only your
+    // own infrastructure and reject X-Forwarded-For spoofing from the internet.
+    //
+    // Railway / Render / Fly.io: 1 hop is correct.
+    // AWS ALB behind CloudFront: use 2.
+    app.set('trust proxy', 1);
+
     // ── CORS ──────────────────────────────────────────────────────────────────
     // SPEC § 5.4 pitfall: set ALLOWED_ORIGINS env var; configure cors() before
     // all routes. Comma-separated origins supported for multi-origin deployments.

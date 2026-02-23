@@ -38,11 +38,12 @@ enum Role {
 // SPEC: organizations table
 // ─────────────────────────────────────────────────────────────────────────────
 model Organization {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String   @db.VarChar(255)
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
+  // password_hash column removed — credentials live exclusively on the User row.
+  // Migration: 20260223000000_drop_org_password_hash
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
   users            User[]
@@ -113,7 +114,11 @@ model Employee {
   name          String   @db.VarChar(255)
   email         String   @db.VarChar(255)
   passwordHash  String   @map("password_hash") @db.Text
-  role          String   @default("EMPLOYEE") @db.VarChar(100)
+  // jobTitle: free-text job title (e.g. "Senior Engineer", "Designer").
+  // Renamed from `role` to avoid confusion with User.role (the ADMIN|EMPLOYEE
+  // RBAC enum).  Migration: 20260223000001_rename_employee_role_to_job_title
+  // Nullable — not every employee has a formal job title at creation time.
+  jobTitle      String?  @map("job_title") @db.VarChar(100)
   department    String?  @db.VarChar(100)
   skills        String[] // maps to TEXT[] in PostgreSQL
   walletAddress String?  @map("wallet_address") @db.VarChar(42)
@@ -243,4 +248,41 @@ model BlockchainLog {
   @@index([taskId])
 
   @@map("blockchain_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORING JOBS  (Postgres-backed durable job queue)
+//
+// Replaces the Redis/BullMQ queue and the in-process setImmediate dispatcher.
+// Jobs survive server restarts because they live in Postgres alongside the
+// rest of the application data — no separate Redis dependency required.
+//
+// Worker pattern: SELECT … FOR UPDATE SKIP LOCKED
+//   The worker polls for pending jobs, locks the row atomically, and processes
+//   it.  SKIP LOCKED means multiple worker processes/threads never race on the
+//   same row.  After success the row is deleted; after final failure it is
+//   moved to status='failed' for post-mortem inspection.
+//
+// Deduplication: jobKey = 'score:task:<taskId>' — UNIQUE constraint means a
+//   second enqueue for the same task is silently dropped (INSERT … ON CONFLICT
+//   DO NOTHING).
+// ─────────────────────────────────────────────────────────────────────────────
+model ScoringJob {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobKey      String   @unique @map("job_key") @db.VarChar(255)   // deduplication key
+  queue       String   @default("scoring") @db.VarChar(100)
+  payload     Json                                                  // ScoreJobPayload
+  status      String   @default("pending") @db.VarChar(20)         // pending | processing | failed
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3) @map("max_attempts")
+  runAt       DateTime @default(now()) @map("run_at") @db.Timestamptz()  // earliest execution time
+  failedAt    DateTime? @map("failed_at") @db.Timestamptz()
+  errorMsg    String?  @map("error_msg") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Worker poll index: WHERE status='pending' AND run_at <= now() ORDER BY run_at ASC
+  @@index([status, runAt], name: "idx_scoring_jobs_poll")
+  @@index([queue, status], name: "idx_scoring_jobs_queue_status")
+
+  @@map("scoring_jobs")
 }

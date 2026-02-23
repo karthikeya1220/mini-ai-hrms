@@ -92,7 +92,7 @@ export async function analyzeHandler(
         const employee = await prisma.employee.findFirst({
             where: { id: body.employeeId, orgId },
             select: {
-                id: true, name: true, role: true, skills: true,
+                id: true, name: true, jobTitle: true, skills: true,
                 tasks: {
                     select: {
                         status: true, complexityScore: true, priority: true,
@@ -151,9 +151,9 @@ export async function analyzeHandler(
 
         } else if (body.type === 'skill-gap') {
             // Build required skills from tasks assigned to same-role employees
-            const sameRoleIds = employee.role
+            const sameRoleIds = employee.jobTitle
                 ? (await prisma.employee.findMany({
-                    where: { orgId, role: employee.role },
+                    where: { orgId, jobTitle: employee.jobTitle },
                     select: { id: true },
                 })).map(e => e.id)
                 : [employee.id];
@@ -174,7 +174,7 @@ export async function analyzeHandler(
 
             analysis = await analyzeSkillGaps({
                 employeeName:   employee.name,
-                role:           employee.role,
+                jobTitle:       employee.jobTitle,
                 currentSkills:  employee.skills,
                 requiredSkills: [...requiredSet],
                 gapSkills,

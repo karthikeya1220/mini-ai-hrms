@@ -5,10 +5,12 @@
 //   POST /api/auth/register  — no auth
 //   POST /api/auth/login     — no auth
 //   POST /api/auth/refresh   — no auth (uses refresh token cookie)
-//   POST /api/auth/logout    — requires access token JWT
+//   POST /api/auth/logout    — no auth (uses refresh token cookie)
 //
-// All auth routes are public EXCEPT logout, which requires the authMiddleware
-// so we know which session to invalidate.
+// Logout does NOT require a valid access token.  The controller reads the
+// httpOnly refresh cookie directly and calls logoutUser(), which verifies
+// the refresh token and increments tokenVersion.  This means a user whose
+// access token has already expired can still log out cleanly.
 //
 // Rate limiting (CRITICAL-3 from arch audit):
 //   POST /register and POST /login are both protected by authRateLimiter():
@@ -19,7 +21,6 @@
 // =============================================================================
 
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimiter';
 import {
     register,
@@ -39,9 +40,9 @@ router.post('/register', limit, register);
 router.post('/login', limit, login);
 
 // ── Public (no rate limit) ────────────────────────────────────────────────────
+// Both routes derive identity from the signed httpOnly refresh cookie —
+// authMiddleware (access token) is deliberately absent from both.
 router.post('/refresh', refresh);
-
-// ── Protected — valid access token required ───────────────────────────────────
-router.post('/logout', authMiddleware, logout);
+router.post('/logout',  logout);
 
 export default router;

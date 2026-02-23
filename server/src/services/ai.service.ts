@@ -72,7 +72,7 @@ export interface ScoringBreakdown {
 
 /** SPEC § 2.5: one entry in the ranked recommendation list. */
 export interface RecommendationEntry {
-    employee: { id: string; name: string; role: string | null; department: string | null; skills: string[] };
+    employee: { id: string; name: string; jobTitle: string | null; department: string | null; skills: string[] };
     skillOverlap: number;   // count of matched skills
     activeCount: number;   // open (non-completed) tasks currently assigned
     perfScore: number;   // productivity score (50 default if no history)
@@ -343,7 +343,7 @@ export async function recommendEmployees(
             isActive: true,
             ...(targetDepartment && { department: targetDepartment }),
         },
-        select: { id: true, name: true, role: true, department: true, skills: true },
+        select: { id: true, name: true, jobTitle: true, department: true, skills: true },
     });
 
     // ── Fetch latest performance score per employee ────────────────────────────
@@ -422,22 +422,22 @@ export async function detectSkillGaps(
     // ── Fetch employee ──────────────────────────────────────────────────────────
     const employee = await prisma.employee.findFirst({
         where: { id: employeeId, orgId },
-        select: { id: true, name: true, role: true, skills: true },
+        select: { id: true, name: true, jobTitle: true, skills: true },
     });
     if (!employee) {
         throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
     }
 
-    // ── Fetch tasks for this role scope ────────────────────────────────────────
-    // Strategy: find all employees with the same role in this org, then aggregate
-    // requiredSkills across all tasks ever assigned to them.
-    // This reflects "tasks that employees in this role handle".
+    // ── Fetch tasks for this jobTitle scope ────────────────────────────────────
+    // Strategy: find all employees with the same jobTitle in this org, then
+    // aggregate requiredSkills across all tasks ever assigned to them.
+    // This reflects "tasks that employees in this job title handle".
     let allTasksForRole: { requiredSkills: string[] }[];
 
-    if (employee.role) {
-        // Employees with the same role
+    if (employee.jobTitle) {
+        // Employees with the same job title
         const sameRoleEmployees = await prisma.employee.findMany({
-            where: { orgId, role: employee.role },
+            where: { orgId, jobTitle: employee.jobTitle },
             select: { id: true },
         });
         const sameRoleIds = sameRoleEmployees.map(e => e.id);

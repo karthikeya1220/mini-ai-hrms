@@ -142,7 +142,7 @@ function buildScoreFallback(
 
 export interface SkillGapPayload {
     employeeName:   string;
-    role:           string | null;
+    jobTitle:       string | null;
     currentSkills:  string[];
     requiredSkills: string[];
     gapSkills:      string[];
@@ -163,7 +163,7 @@ export interface SkillGapAnalysis {
 export async function analyzeSkillGaps(
     payload: SkillGapPayload,
 ): Promise<SkillGapAnalysis> {
-    const { employeeName, role, currentSkills, gapSkills, coverageRate } = payload;
+    const { employeeName, currentSkills, gapSkills, coverageRate } = payload;
 
     if (gapSkills.length === 0) {
         return {
@@ -182,7 +182,7 @@ and return a structured JSON response with a prioritized learning plan.
 
 EMPLOYEE DATA:
 - Name: ${employeeName}
-- Role: ${role ?? 'Not specified'}
+- Role: ${payload.jobTitle ?? 'Not specified'}
 - Current Skills: ${currentSkills.length > 0 ? currentSkills.join(', ') : 'None listed'}
 - Required Skills (for their role): ${payload.requiredSkills.join(', ')}
 - Skill Gaps (missing): ${gapSkills.join(', ')}

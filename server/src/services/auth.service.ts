@@ -1,8 +1,25 @@
 // =============================================================================
 // Auth service — JWT token lifecycle for the RBAC auth system.
 //
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │  SINGLE JWT AUTHORITY                                                   │
+// │                                                                         │
+// │  This file is the ONLY place in the codebase where JWTs are signed     │
+// │  or verified.  Do NOT import jsonwebtoken directly in any other module. │
+// │  Do NOT use src/utils/jwt.ts — that file has been deleted (it carried   │
+// │  an incompatible payload shape that lacked tokenVersion, breaking the   │
+// │  refresh-token revocation contract).                                    │
+// │                                                                         │
+// │  Exports for consumers:                                                 │
+// │    signAccessToken(user)    → signed access JWT string                  │
+// │    verifyAccessToken(token) → AccessTokenPayload (throws on failure)    │
+// │    signRefreshToken(user)   → signed refresh JWT string                 │
+// │    verifyRefreshToken(token)→ RefreshTokenPayload (throws on failure)   │
+// │    signTokenPair(user)      → { accessToken, refreshToken }             │
+// └─────────────────────────────────────────────────────────────────────────┘
+//
 // Design contract (AUTH_SYSTEM.md):
-//   Access token  — 1 h,  signed with JWT_SECRET
+//   Access token  — 15 m, signed with JWT_SECRET
 //                   payload: { userId, orgId, employeeId, email, role }
 //   Refresh token — 7 d,  signed with JWT_REFRESH_SECRET
 //                   payload: { userId, orgId, tokenVersion }
@@ -17,7 +34,22 @@
 //   JWT_REFRESH_SECRET  — required, refresh-token signing key (different key)
 //   Both are read inside each function so test suites can swap them via
 //   process.env without module-level caching issues.
-// =============================================================================
+//
+// Key rotation (kid):
+//   Every signed token carries a `kid` header identifying which secret was
+//   used.  Verifiers can inspect jwt.decode(token, { complete: true }).header.kid
+//   to select the correct key before calling verify().  When rotating:
+//     1. Deploy new secret under a new env-var name.
+//     2. Update JWT_KID / JWT_REFRESH_KID to the new key identifier.
+//     3. Old tokens (carrying the previous kid) naturally expire within TTL;
+//        forced immediate revocation is handled via tokenVersion increment.
+//   No asymmetric crypto is used yet — kid is purely informational here but
+//   ensures the infrastructure is in place when RS256/ES256 is adopted.
+//
+//   Env vars for key identifiers (optional — defaults to 'v1'):
+//     JWT_KID          — kid written into access token headers
+//     JWT_REFRESH_KID  — kid written into refresh token headers
+// ============================================================================= 
 
 import jwt, { SignOptions, JwtPayload } from 'jsonwebtoken';
 import { AppError } from '../middleware/errorHandler';
@@ -126,17 +158,42 @@ function mapJwtError(err: unknown, context: 'access' | 'refresh'): never {
   throw new AppError(401, 'INVALID_TOKEN', `${label} token verification failed.`);
 }
 
+// ─── Key-ID resolution ────────────────────────────────────────────────────────
+
+/**
+ * Return the key identifier (kid) to embed in a JWT header.
+ *
+ * The kid is an opaque label — it identifies WHICH secret was used to sign a
+ * token so that verifiers can select the correct key when multiple key versions
+ * are in circulation during a rotation window.
+ *
+ * Convention used here:
+ *   JWT_KID         → access token kid   (default: 'v1')
+ *   JWT_REFRESH_KID → refresh token kid  (default: 'v1')
+ *
+ * Rotation procedure (no asymmetric crypto yet):
+ *   1. Generate a new secret and store it in a new env-var (e.g. JWT_SECRET_V2).
+ *   2. Point JWT_SECRET to the new value and set JWT_KID='v2'.
+ *   3. Tokens signed before the rotation carry kid='v1' and expire within
+ *      their TTL (15 m / 7 d).  Force-expire via tokenVersion if needed.
+ *   4. Once all v1 tokens have expired, decommission the old secret.
+ */
+function resolveKeyId(envVar: string, defaultKid: string): string {
+    return process.env[envVar] ?? defaultKid;
+}
+
 // ─── Access token ─────────────────────────────────────────────────────────────
 
 /**
  * Sign a short-lived access token for the given User.
  *
  * @param user  Minimal User row slice — see TokenUser.
- * @returns     Signed JWT string, expires in 1 h (overridable via JWT_EXPIRES_IN).
+ * @returns     Signed JWT string, expires in 15 m (overridable via JWT_EXPIRES_IN).
  */
 export function signAccessToken(user: TokenUser): string {
-  const secret = requireEnv('JWT_SECRET');
-  const expiresIn = (process.env.JWT_EXPIRES_IN ?? '1h') as SignOptions['expiresIn'];
+  const secret    = requireEnv('JWT_SECRET');
+  const expiresIn = (process.env.JWT_EXPIRES_IN ?? '15m') as SignOptions['expiresIn'];
+  const kid       = resolveKeyId('JWT_KID', 'v1');
 
   const claims: Omit<AccessTokenPayload, keyof JwtPayload> = {
     userId:     user.id,
@@ -151,6 +208,7 @@ export function signAccessToken(user: TokenUser): string {
     expiresIn,
     issuer:    'mini-ai-hrms',
     algorithm: 'HS256',
+    keyid:     kid,          // identifies which secret was used — enables key rotation
   });
 }
 
@@ -202,8 +260,9 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
  * @returns     Signed JWT string, expires in 7 d (overridable via JWT_REFRESH_EXPIRES_IN).
  */
 export function signRefreshToken(user: TokenUser): string {
-  const secret = requireEnv('JWT_REFRESH_SECRET');
+  const secret    = requireEnv('JWT_REFRESH_SECRET');
   const expiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as SignOptions['expiresIn'];
+  const kid       = resolveKeyId('JWT_REFRESH_KID', 'v1');
 
   const claims: Omit<RefreshTokenPayload, keyof JwtPayload> = {
     userId:       user.id,
@@ -216,6 +275,7 @@ export function signRefreshToken(user: TokenUser): string {
     expiresIn,
     issuer:    'mini-ai-hrms',
     algorithm: 'HS256',
+    keyid:     kid,          // identifies which secret was used — enables key rotation
   });
 }
 
@@ -286,12 +346,8 @@ export interface RegisterInput {
   email: string;
   /** Plain-text password — hashed with bcrypt (12 rounds) before storage. */
   password: string;
-  /**
-   * Role for the registering user.
-   * Defaults to 'ADMIN' (org-owner self-registration).
-   * Pass 'EMPLOYEE' when an org allows employees to self-register.
-   */
-  role?: Role;
+  // role is intentionally absent — self-registration ALWAYS produces ADMIN.
+  // Employee accounts are created by an authenticated ADMIN via POST /api/employees.
 }
 
 export interface RegisterResult {
@@ -332,7 +388,10 @@ export interface RegisterResult {
  * @throws AppError 500 DB_ERROR      on unexpected Prisma failures.
  */
 export async function registerUser(input: RegisterInput): Promise<RegisterResult> {
-  const { orgName, email, password, role = 'ADMIN' } = input;
+  const { orgName, email, password } = input;
+  // Role is always ADMIN for self-registration — not caller-supplied.
+  // Employee accounts are created by an ADMIN via the employee service.
+  const role: Role = 'ADMIN';
 
   // Hash before entering the transaction so bcrypt's CPU cost does not hold
   // a DB connection open longer than necessary.
@@ -343,16 +402,16 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
       // 1. Create organization (tenant root).
       const org = await tx.organization.create({
         data: {
-          name:         orgName,
-          email,                 // org contact email mirrors the owner's email
-          passwordHash: '',      // Organization.passwordHash is a legacy SPEC field;
-                                 // credentials now live exclusively on the User row.
+          name:  orgName,
+          email, // org contact email mirrors the owner's email
+          // passwordHash column removed — credentials live on the User row only.
         },
         select: { id: true, name: true },
       });
 
-      // 2. Create the first user with the requested role.
-      //    Defaults to ADMIN (org-owner self-registration path).
+      // 2. Create the first user — role is hardcoded to ADMIN.
+      //    Self-registration always produces an org owner.  Employees are
+      //    provisioned separately via POST /api/employees (ADMIN only).
       //    employeeId is intentionally omitted (null) — the User exists at the
       //    auth layer; an Employee profile is a separate business-logic concern.
       const user = await tx.user.create({
@@ -360,7 +419,7 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
           orgId:        org.id,
           email,
           passwordHash,
-          role,          // caller-supplied; defaults to 'ADMIN'
+          role,          // hardcoded 'ADMIN' — never caller-supplied
           // tokenVersion: 0 — Prisma default, no need to set explicitly
           // isActive:     true — Prisma default
           // employeeId:   null — Prisma default (optional relation)
@@ -528,30 +587,35 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
 export interface RefreshResult {
   /** New short-lived access token. */
   accessToken: string;
+  /** New refresh token — caller MUST replace the httpOnly cookie immediately. */
+  refreshToken: string;
 }
 
 /**
- * Issue a new access token from a valid, non-revoked refresh token.
+ * Issue a new access token AND a new refresh token (token rotation).
  *
- * Intentionally issues an access token ONLY — the refresh token is NOT
- * rotated here.  Rotation would require re-setting the cookie on every
- * silent refresh, which adds complexity with no meaningful security gain
- * for a short-lived (1 h) access token.  The refresh token's 7-day TTL
- * and the tokenVersion revocation mechanism together bound the attack window.
+ * Rotation model:
+ *   Every successful refresh atomically increments tokenVersion in the DB,
+ *   then signs a new refresh token embedding the incremented version.
+ *   The old refresh token now embeds a stale version — any attempt to reuse
+ *   it will fail the tokenVersion comparison check (step 5), ensuring that a
+ *   stolen token can only be exploited once before being invalidated.
  *
  * Revocation model:
  *   The refresh JWT embeds the tokenVersion that was current at sign time.
  *   The User row's tokenVersion is the ground truth.  Any operation that
- *   must invalidate all sessions (logout, password change) increments the
- *   DB column.  This check catches tokens whose embedded version is stale.
+ *   must invalidate all sessions (logout, password change, rotation) increments
+ *   the DB column.  This check catches tokens whose embedded version is stale.
  *
  * Step-by-step:
  *   1. verifyRefreshToken — validates signature, issuer, algorithm, expiry,
  *      and payload shape.  Throws 401 on any failure.
  *   2. DB lookup by userId — confirms the user still exists.
  *   3. isActive check — deactivated accounts cannot refresh.
- *   4. tokenVersion comparison — rejects revoked tokens.
- *   5. signAccessToken — issues a fresh 1 h access token.
+ *   4. tokenVersion comparison — rejects revoked or replayed tokens.
+ *   5. Atomic tokenVersion increment — invalidates the consumed token.
+ *   6. signAccessToken + signRefreshToken — issues fresh tokens embedding
+ *      the new (incremented) version.
  *
  * @param rawToken  The raw refresh token string read from the httpOnly cookie.
  * @throws AppError 401 MISSING_REFRESH_TOKEN  cookie was absent.
@@ -559,7 +623,7 @@ export interface RefreshResult {
  * @throws AppError 401 TOKEN_EXPIRED          refresh token past its TTL.
  * @throws AppError 401 USER_NOT_FOUND         userId in token no longer exists.
  * @throws AppError 401 USER_INACTIVE          account has been deactivated.
- * @throws AppError 401 TOKEN_REVOKED          tokenVersion mismatch.
+ * @throws AppError 401 TOKEN_REVOKED          tokenVersion mismatch (reuse or logout).
  */
 export async function refreshAccessToken(rawToken: string): Promise<RefreshResult> {
   // 1. Cryptographic verification — throws on invalid/expired/malformed token.
@@ -589,26 +653,38 @@ export async function refreshAccessToken(rawToken: string): Promise<RefreshResul
     throw new AppError(401, 'USER_INACTIVE', 'This account has been deactivated.');
   }
 
-  // 5. tokenVersion comparison — the single revocation check.
-  //    payload.tokenVersion is the version at the moment the refresh token was signed.
+  // 5. tokenVersion comparison — the reuse / revocation check.
+  //    payload.tokenVersion is the version embedded when this refresh token was signed.
   //    user.tokenVersion is the current ground truth from the DB.
-  //    A mismatch means logout or password-change has occurred since this token was issued.
+  //    A mismatch means this token has already been rotated, logged out, or
+  //    revoked by a password change — it must be rejected.
   if (user.tokenVersion !== payload.tokenVersion) {
     throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked. Please log in again.');
   }
 
-  // 6. Issue a new access token only.
+  // 6. Atomically increment tokenVersion — consumes the current refresh token.
+  //    The old token now embeds a stale version; any replay attempt fails step 5.
+  //    updateMany avoids a throw if the row is deleted mid-flight (count === 0
+  //    is an acceptable silent outcome — the account is already gone).
+  const newVersion = user.tokenVersion + 1;
+  await prisma.user.updateMany({
+    where: { id: user.id },
+    data:  { tokenVersion: { increment: 1 } },
+  });
+
+  // 7. Issue both tokens embedding the NEW version.
   const tokenUser: TokenUser = {
     id:           user.id,
     orgId:        user.orgId,
     employeeId:   user.employeeId,
     email:        user.email,
     role:         user.role as Role,
-    tokenVersion: user.tokenVersion,
+    tokenVersion: newVersion,
   };
 
   return {
-    accessToken: signAccessToken(tokenUser),
+    accessToken:  signAccessToken(tokenUser),
+    refreshToken: signRefreshToken(tokenUser),
   };
 }
 

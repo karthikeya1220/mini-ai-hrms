@@ -1,0 +1,21 @@
+-- Migration: rename_employee_role_to_job_title
+--
+-- Renames employees.role → employees.job_title.
+--
+-- Background:
+--   employees.role was a free-text VARCHAR(100) carrying job titles such as
+--   "Engineer", "Designer", "Manager".  This clashed in naming with the RBAC
+--   Role enum on the users table (ADMIN | EMPLOYEE), making it ambiguous which
+--   "role" was being referred to in code and API responses.
+--
+--   After this migration:
+--     employees.job_title  — free-text job title, optional (VARCHAR 100)
+--     users.role           — RBAC enum: ADMIN | EMPLOYEE (unchanged)
+--
+-- This is a non-destructive rename; no data is lost.
+-- All existing rows retain their current string values.
+--
+-- Down (manual rollback if needed):
+--   ALTER TABLE "employees" RENAME COLUMN "job_title" TO "role";
+
+ALTER TABLE "employees" RENAME COLUMN "role" TO "job_title";

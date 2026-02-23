@@ -1,0 +1,21 @@
+-- Migration: drop_org_password_hash
+--
+-- Removes the legacy password_hash column from the organizations table.
+--
+-- Background:
+--   The original SPEC placed a password_hash column on organizations, but the
+--   RBAC auth system stores all credentials on the users table instead.
+--   The column was written as an empty string ('') on every org creation and
+--   was never read for authentication.  Retaining it is misleading and creates
+--   a risk that future code could accidentally rely on it.
+--
+-- Safety:
+--   The column is NOT NULL but carried no meaningful data (always '').
+--   No application code reads organizations.password_hash.
+--   This is a non-reversible destructive migration — ensure a DB backup exists
+--   before applying in production.
+--
+-- Down (manual rollback if needed):
+--   ALTER TABLE "organizations" ADD COLUMN "password_hash" TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE "organizations" DROP COLUMN "password_hash";

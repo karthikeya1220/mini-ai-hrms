@@ -41,7 +41,7 @@ const WalletAddressSchema = z
 const CreateEmployeeSchema = z.object({
     name: z.string().min(1, 'Name is required').max(255),
     email: z.string().email('Invalid email').max(255),
-    role: z.string().max(100).optional(),
+    jobTitle: z.string().max(100).optional(),
     department: z.string().max(100).optional(),
     skills: z.array(z.string().min(1)).default([]),
     walletAddress: WalletAddressSchema,
@@ -51,7 +51,7 @@ const CreateEmployeeSchema = z.object({
 const UpdateEmployeeSchema = z.object({
     name: z.string().min(1).max(255).optional(),
     email: z.string().email('Invalid email').max(255).optional(),
-    role: z.string().max(100).optional(),
+    jobTitle: z.string().max(100).optional(),
     department: z.string().max(100).optional(),
     skills: z.array(z.string().min(1)).optional(),
     walletAddress: WalletAddressSchema,
@@ -62,11 +62,12 @@ const UpdateEmployeeSchema = z.object({
 
 const ListQuerySchema = z.object({
     department: z.string().optional(),
-    role: z.string().optional(),
+    jobTitle: z.string().optional(),
     // isActive: defaults to true (active only) — can be overridden to 'false' for admin views
     isActive: z.enum(['true', 'false']).optional().transform((v) => v !== 'false'),
     limit: z.coerce.number().int().min(1).max(100).optional(),
-    cursor: z.string().uuid('cursor must be a UUID').optional(),
+    // cursor is an opaque base64url token (encodes createdAt + id) — not a raw UUID
+    cursor: z.string().min(1).optional(),
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -90,7 +91,6 @@ export async function createEmployeeHandler(
 
         const { employee, user, temporaryPassword } = await createEmployee(orgId, {
             ...input,
-            role: input.role as any,
         });
 
         // Return the employee record (orgId stripped), the linked user account
@@ -120,7 +120,7 @@ export async function listEmployeesHandler(
         const result = await listEmployees({
             orgId,
             department: query.department,
-            role: query.role,
+            jobTitle: query.jobTitle,
             isActive: query.isActive,
             limit: query.limit,
             cursor: query.cursor,

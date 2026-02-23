@@ -5,7 +5,12 @@
 //   POST /api/auth/register  — create org + first ADMIN user, issue tokens
 //   POST /api/auth/login     — verify credentials, issue tokens
 //   POST /api/auth/refresh   — rotate tokens via httpOnly cookie
-//   POST /api/auth/logout    — increment tokenVersion, clear cookie
+//   POST /api/auth/logout    — read refresh cookie, increment tokenVersion, clear cookie
+//
+// Logout does NOT require a valid access token.  userId is extracted from the
+// signed refresh token cookie so that a user with an expired access token can
+// still invalidate their session.  logoutUser() in auth.service.ts performs
+// the tokenVersion increment via verifyRefreshToken(rawToken).
 //
 // Cookie contract:
 //   Name:     refreshToken
@@ -52,13 +57,16 @@ function clearRefreshCookie(res: Response): void {
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
+// role is intentionally absent — registration ALWAYS produces an ADMIN.
+// Employee accounts are created exclusively by an authenticated ADMIN via
+// POST /api/employees.  Accepting role from the client would let any
+// anonymous caller self-register as EMPLOYEE on a new org they control.
 const RegisterSchema = z.object({
     orgName:  z.string().min(1, 'Organization name is required').max(255),
     email:    z.string().email('Invalid email address').max(255),
     password: z.string()
         .min(8,  'Password must be at least 8 characters')
         .max(72, 'Password must be at most 72 characters'),  // bcrypt hard limit
-    role:     z.enum(['ADMIN', 'EMPLOYEE']).default('ADMIN'),
 });
 
 const LoginSchema = z.object({
@@ -131,9 +139,11 @@ export async function refresh(
 
         const result = await refreshAccessToken(token);
 
-        // Access token returned in body only. Refresh cookie is NOT touched —
-        // intentional: the existing cookie continues to be used until logout
-        // or password change increments tokenVersion.
+        // Rotation: replace the old httpOnly cookie with the newly issued refresh token.
+        // The old token's embedded tokenVersion is now stale — any replay attempt
+        // will be rejected by the tokenVersion check in refreshAccessToken().
+        setRefreshCookie(res, result.refreshToken);
+
         sendSuccess(res, { accessToken: result.accessToken });
     } catch (err) {
         next(err);

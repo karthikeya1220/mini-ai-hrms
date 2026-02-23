@@ -45,12 +45,11 @@ async function main() {
     });
 
     if (!org) {
-        const pwHash = await hash(ADMIN_PW);
         org = await (prisma.organization as any).create({
             data: {
-                name:         ORG_NAME,
-                email:        ORG_EMAIL,
-                passwordHash: pwHash,
+                name:  ORG_NAME,
+                email: ORG_EMAIL,
+                // passwordHash removed from Organization — credentials live on User only.
             },
         });
         console.log(`✅ Created org: ${org.name} (${org.id})`);
@@ -82,7 +81,7 @@ async function main() {
         {
             name:       'Alice Chen',
             email:      'alice@acme.com',
-            role:       'Engineer',
+            jobTitle:   'Engineer',
             department: 'Engineering',
             skills:     ['TypeScript', 'React', 'Node.js'],
             pw:         'alice-temp-pw',
@@ -90,7 +89,7 @@ async function main() {
         {
             name:       'Bob Martinez',
             email:      'bob@acme.com',
-            role:       'Designer',
+            jobTitle:   'Designer',
             department: 'Design',
             skills:     ['Figma', 'CSS', 'UX Research'],
             pw:         'bob-temp-pw',
@@ -98,7 +97,7 @@ async function main() {
         {
             name:       'Charlie Park',
             email:      'charlie@acme.com',
-            role:       'Manager',
+            jobTitle:   'Manager',
             department: 'Operations',
             skills:     ['Leadership', 'Agile', 'SQL'],
             pw:         'charlie-temp-pw',
@@ -106,7 +105,7 @@ async function main() {
         {
             name:       'Diana Okonkwo',
             email:      'diana@acme.com',
-            role:       'Data Scientist',
+            jobTitle:   'Data Scientist',
             department: 'AI',
             skills:     ['Python', 'Machine Learning', 'TensorFlow'],
             pw:         'diana-temp-pw',
@@ -114,7 +113,7 @@ async function main() {
         {
             name:       'Ethan Brooks',
             email:      'ethan@acme.com',
-            role:       'DevOps Engineer',
+            jobTitle:   'DevOps Engineer',
             department: 'Infrastructure',
             skills:     ['Docker', 'Kubernetes', 'AWS'],
             pw:         'ethan-temp-pw',
@@ -142,7 +141,7 @@ async function main() {
                 name:         emp.name,
                 email:        emp.email,
                 passwordHash: pwHash,
-                role:         emp.role,
+                jobTitle:     emp.jobTitle,
                 department:   emp.department,
                 skills:       emp.skills,
             },

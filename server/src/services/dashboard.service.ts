@@ -35,7 +35,7 @@ import { getLatestScoreMap } from '../lib/performanceLog';
 export interface EmployeeCompletionStat {
     employeeId: string;
     name: string;
-    role: string | null;
+    jobTitle: string | null;   // free-text job title — NOT the RBAC role
     department: string | null;
     isActive: boolean;
     tasksAssigned: number;
@@ -187,7 +187,7 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
         // 3. Employee metadata
         prisma.employee.findMany({
             where: { orgId },
-            select: { id: true, name: true, role: true, department: true, isActive: true },
+            select: { id: true, name: true, jobTitle: true, department: true, isActive: true },
             orderBy: { name: 'asc' },
         }),
 
@@ -257,7 +257,7 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
         return {
             employeeId: emp.id,
             name: emp.name,
-            role: emp.role,
+            jobTitle: emp.jobTitle,
             department: emp.department,
             isActive: emp.isActive,
             tasksAssigned: counts.assigned,

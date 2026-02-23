@@ -21,7 +21,7 @@
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { hashPassword } from '../utils/hash';
-import { EmployeeRow, EmployeeResponse, PaginatedResponse, UserRole } from '../types';
+import { EmployeeRow, EmployeeResponse, PaginatedResponse } from '../types';
 
 // ─── Crypto — temporary password generation ───────────────────────────────────
 import { randomBytes } from 'crypto';
@@ -40,7 +40,7 @@ const EMPLOYEE_SELECT = {
     orgId: true,
     name: true,
     email: true,
-    role: true,
+    jobTitle: true,
     department: true,
     skills: true,
     walletAddress: true,
@@ -54,7 +54,7 @@ type PrismaEmployeeRow = {
     orgId: string;
     name: string;
     email: string;
-    role: string;
+    jobTitle: string | null;
     department: string | null;
     skills: string[];
     walletAddress: string | null;
@@ -63,10 +63,7 @@ type PrismaEmployeeRow = {
 };
 
 function mapRow(row: PrismaEmployeeRow): EmployeeRow {
-    return {
-        ...row,
-        role: row.role as UserRole,
-    };
+    return { ...row };
 }
 
 /** Strip orgId before sending to client. Called in controller, not service. */
@@ -81,7 +78,7 @@ export function toResponse(row: EmployeeRow): EmployeeResponse {
 export interface CreateEmployeeInput {
     name: string;
     email: string;
-    role?: UserRole;
+    jobTitle?: string;
     department?: string;
     skills?: string[];
     walletAddress?: string;
@@ -144,7 +141,7 @@ export async function createEmployee(
                     name:          input.name,
                     email:         input.email,
                     passwordHash,
-                    role:          input.role ?? 'EMPLOYEE',
+                    jobTitle:      input.jobTitle ?? null,
                     department:    input.department  ?? null,
                     skills:        input.skills      ?? [],
                     walletAddress: input.walletAddress ?? null,
@@ -197,50 +194,90 @@ export async function createEmployee(
 
 // ─── LIST (paginated) ─────────────────────────────────────────────────────────
 
+/**
+ * Encode the last row of a page into an opaque cursor token.
+ * Format (before base64): "<ISO-timestamp>|<uuid>"
+ * Using both createdAt AND id gives a stable, globally-unique composite key:
+ *   - createdAt alone is not unique (rows inserted in the same ms clash)
+ *   - id alone has no defined insertion order (UUID v4 is random)
+ */
+function encodeCursor(createdAt: Date, id: string): string {
+    return Buffer.from(`${createdAt.toISOString()}|${id}`).toString('base64url');
+}
+
+function decodeCursor(token: string): { createdAt: Date; id: string } {
+    const raw = Buffer.from(token, 'base64url').toString('utf8');
+    const pipe = raw.lastIndexOf('|');
+    if (pipe === -1) throw new AppError(400, 'BAD_CURSOR', 'Invalid pagination cursor');
+    return {
+        createdAt: new Date(raw.slice(0, pipe)),
+        id:        raw.slice(pipe + 1),
+    };
+}
+
 export interface ListEmployeesInput {
     orgId: string;
     department?: string;
-    role?: string;
+    jobTitle?: string;
     isActive?: boolean;   // defaults to true — SPEC Risk R4
     limit?: number;    // default 20, max 100
-    cursor?: string;    // UUID of last record from previous page
+    cursor?: string;    // opaque base64url token encoding (createdAt, id) of last row
 }
 
 export async function listEmployees(
     input: ListEmployeesInput,
 ): Promise<PaginatedResponse<EmployeeRow>> {
-    const limit = Math.min(input.limit ?? 20, 100); // cap at 100
-    const isActive = input.isActive ?? true;         // SPEC Risk R4: default to active only
+    const limit  = Math.min(input.limit ?? 20, 100); // cap at 100
+    const isActive = input.isActive ?? true;          // SPEC Risk R4: default to active only
 
-    // Build the where clause — orgId is always the first guard
-    const where = {
-        orgId: input.orgId,                       // ← tenant boundary
+    // ── Composite-cursor WHERE clause ─────────────────────────────────────────
+    // Ordering is (createdAt ASC, id ASC).  To continue from the last seen row
+    // we want rows where:
+    //   createdAt > cursorTs  OR  (createdAt = cursorTs AND id > cursorId)
+    // This is the standard "seek method" / keyset pagination pattern; it is
+    // stable even when rows share a createdAt timestamp.
+    let cursorWhere: object = {};
+    if (input.cursor) {
+        const { createdAt: cursorTs, id: cursorId } = decodeCursor(input.cursor);
+        cursorWhere = {
+            OR: [
+                { createdAt: { gt: cursorTs } },
+                { createdAt: cursorTs, id: { gt: cursorId } },
+            ],
+        };
+    }
+
+    const baseWhere = {
+        orgId: input.orgId,                       // ← tenant boundary — always first
         isActive,
         ...(input.department && { department: input.department }),
-        ...(input.role && { role: input.role }),
-        // Cursor-based pagination: fetch records AFTER the cursor ID
-        // SPEC § Hour 4–7: "cursor based (not offset-based — offset degrades at scale)"
-        ...(input.cursor && {
-            id: { gt: input.cursor },                    // UUID lexicographic ordering
-        }),
+        ...(input.jobTitle   && { jobTitle:   input.jobTitle   }),
     };
 
-    // Run count and data fetch in parallel — single round-trip latency
+    const where = { ...baseWhere, ...cursorWhere };
+
+    // Run count and data fetch in parallel — single round-trip latency.
+    // Count uses only baseWhere (cursor position must not shrink the total count).
     const [total, rows] = await Promise.all([
-        prisma.employee.count({ where: { orgId: input.orgId, isActive } }),
+        prisma.employee.count({ where: baseWhere }),
         prisma.employee.findMany({
             where,
-            select: EMPLOYEE_SELECT,
-            orderBy: { createdAt: 'asc' },
-            take: limit + 1,                          // fetch one extra to determine if next page exists
+            select:  EMPLOYEE_SELECT,
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], // composite, stable ordering
+            take:    limit + 1,                               // +1 to detect next page
         }),
     ]);
 
     // If we got limit+1 rows, there is a next page
-    const hasMore = rows.length > limit;
-    const dataRaw = hasMore ? rows.slice(0, limit) : rows;
-    const data = dataRaw.map((r) => mapRow(r));
-    const nextCursor = hasMore ? (data[data.length - 1]?.id ?? null) : null;
+    const hasMore  = rows.length > limit;
+    const dataRaw  = hasMore ? rows.slice(0, limit) : rows;
+    const data     = dataRaw.map((r) => mapRow(r));
+
+    // Encode the composite cursor from the last returned row
+    const lastRow   = dataRaw[dataRaw.length - 1];
+    const nextCursor = hasMore && lastRow
+        ? encodeCursor(lastRow.createdAt, lastRow.id)
+        : null;
 
     return { data, nextCursor, total };
 }
@@ -275,7 +312,7 @@ export async function getEmployeeById(
 export interface UpdateEmployeeInput {
     name?: string;
     email?: string;
-    role?: string;
+    jobTitle?: string;
     department?: string;
     skills?: string[];
     walletAddress?: string;
@@ -308,7 +345,7 @@ export async function updateEmployee(
             data: {
                 ...(input.name !== undefined && { name: input.name }),
                 ...(input.email !== undefined && { email: input.email }),
-                ...(input.role !== undefined && { role: input.role }),
+                ...(input.jobTitle !== undefined && { jobTitle: input.jobTitle }),
                 ...(input.department !== undefined && { department: input.department }),
                 ...(input.skills !== undefined && { skills: input.skills }),
                 ...(input.walletAddress !== undefined && { walletAddress: input.walletAddress }),
@@ -335,8 +372,9 @@ export async function updateEmployee(
     // AFTER the atomic write completes — not a TOCTOU risk because:
     //   1. We already confirmed the record exists and belongs to this org above.
     //   2. The read is for response shaping only; no security decision depends on it.
-    const employee = await prisma.employee.findUniqueOrThrow({
-        where: { id: employeeId },
+    //   orgId included so a cross-tenant read is structurally impossible.
+    const employee = await prisma.employee.findFirstOrThrow({
+        where:  { id: employeeId, orgId },
         select: EMPLOYEE_SELECT,
     });
     return mapRow(employee);
@@ -362,18 +400,27 @@ export async function deactivateEmployee(
     orgId: string,
     employeeId: string,
 ): Promise<EmployeeRow> {
-    const result = await prisma.employee.updateMany({
-        where: { id: employeeId, orgId },   // ownership + mutation in one round-trip
-        data: { isActive: false },
-    });
+    // Atomically disable the Employee row AND its linked User account so that
+    // in-flight sessions are rejected by authMiddleware's isActive check.
+    const [result] = await prisma.$transaction([
+        prisma.employee.updateMany({
+            where: { id: employeeId, orgId },   // ownership guard — org-scoped
+            data:  { isActive: false },
+        }),
+        prisma.user.updateMany({
+            where: { employeeId, orgId },       // same ownership guard on User side
+            data:  { isActive: false },
+        }),
+    ]);
 
     if (result.count === 0) {
         throw new AppError(404, 'EMPLOYEE_NOT_FOUND', 'Employee not found');
     }
 
-    // Fetch the updated row for the response (read-after-write for shaping only).
-    const employee = await prisma.employee.findUniqueOrThrow({
-        where: { id: employeeId },
+    // Read-after-write only for response shaping — ownership already enforced above.
+    //   orgId included so a cross-tenant read is structurally impossible.
+    const employee = await prisma.employee.findFirstOrThrow({
+        where:  { id: employeeId, orgId },
         select: EMPLOYEE_SELECT,
     });
     return mapRow(employee);

@@ -5,10 +5,10 @@
 //   1. dotenv/config      — populate process.env (MUST be first import)
 //   2. PORT guard         — fail fast if PORT is not set (prevents proxy mismatch)
 //   3. initRedis()        — connect the dashboard-cache Redis singleton (optional)
-//   4. initScoringQueue() — connect BullMQ queue + worker (optional, needs Redis)
+//   4. initScoringQueue() — start the Postgres-backed job queue worker
 //   5. createApp()        — build Express app + register routes
 //   6. app.listen()       — bind HTTP port
-//   7. SIGTERM/SIGINT     — graceful shutdown (worker drain → queue close → Redis close → Prisma close)
+//   7. SIGTERM/SIGINT     — graceful shutdown (worker drain → Redis close → Prisma close)
 // =============================================================================
 
 import 'dotenv/config'; // side-effect import — populates process.env from .env
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
     //
     // Shutdown order matters:
     //   1. Stop accepting new HTTP connections (server.close)
-    //   2. Wait for the BullMQ worker to finish its in-flight job (closeScoringQueue)
+    //   2. Wait for the Postgres worker to finish its in-flight job (closeScoringQueue)
     //   3. Close the dashboard-cache Redis connection (disconnectRedis)
     //   4. Close Prisma / DB connection pool (prisma.$disconnect)
     async function shutdown(signal: string): Promise<void> {

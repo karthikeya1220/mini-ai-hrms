@@ -55,7 +55,7 @@ export interface EmployeeRow {
     orgId: string;   // NOT sent to client — internal use only
     name: string;
     email: string;
-    role: UserRole;
+    jobTitle: string | null;   // free-text job title — NOT the RBAC role (see User.role)
     department: string | null;
     skills: string[];
     walletAddress: string | null;

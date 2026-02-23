@@ -140,7 +140,7 @@ export async function recommendHandler(
                 employee: {
                     id: entry.employee.id,
                     name: entry.employee.name,
-                    role: entry.employee.role,
+                    jobTitle: entry.employee.jobTitle,
                     department: entry.employee.department,
                     skills: entry.employee.skills,
                 },
