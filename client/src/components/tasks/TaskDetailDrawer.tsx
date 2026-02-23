@@ -302,27 +302,39 @@ export function TaskDetailDrawer({
                     <div>
                         <SectionLabel>Blockchain Verification</SectionLabel>
                         {task.txHash ? (
-                            <div className="flex items-center gap-2">
-                                <span className="flex items-center gap-1.5 text-xs text-violet-400">
-                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {/* Verified badge */}
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
-                                    On-chain verified
+                                    Verified
                                 </span>
+                                {/* PolygonScan link */}
                                 <a
                                     href={`https://amoy.polygonscan.com/tx/${task.txHash}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-[10px] tabular-nums text-slate-500 hover:text-violet-400 border border-slate-800 rounded px-1.5 py-0.5"
-                                    aria-label="View on PolygonScan"
+                                    className="inline-flex items-center gap-1 text-[10px] tabular-nums text-slate-500 hover:text-violet-400 border border-slate-800 hover:border-violet-500/40 rounded px-1.5 py-0.5 transition-colors"
+                                    aria-label="View transaction on PolygonScan"
                                 >
                                     {task.txHash.slice(0, 8)}…{task.txHash.slice(-6)}
+                                    <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                        <polyline points="15 3 21 3 21 9" />
+                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                    </svg>
                                 </a>
                             </div>
                         ) : (
-                            <p className="text-xs text-slate-600">Not yet logged on-chain</p>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-500">
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                Not Verified
+                            </span>
                         )}
                     </div>
 

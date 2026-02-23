@@ -19,11 +19,13 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useWeb3Context } from '../context/Web3Context';
 import { useTasks } from '../hooks/useTasks';
 import { getEmployeeScore, getSkillGap } from '../api/employees';
 import type { ProductivityScore, SkillGap } from '../api/employees';
 import type { Task, TaskStatus } from '../api/tasks';
 import { updateTaskStatus } from '../api/tasks';
+import { postWeb3Log } from '../api/web3';
 import { TaskDetailDrawer } from '../components/tasks/TaskDetailDrawer';
 import toast from 'react-hot-toast';
 
@@ -192,6 +194,30 @@ function TaskRow({ task, onClick }: TaskRowProps) {
                 {STATUS_LABEL[task.status]}
             </span>
 
+            {/* Blockchain verification badge — visible on completed tasks */}
+            {task.status === 'completed' && (
+                task.txHash ? (
+                    <a
+                        href={`https://amoy.polygonscan.com/tx/${task.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="flex-shrink-0 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        aria-label="Blockchain verified — view on PolygonScan"
+                        title={`Verified: ${task.txHash.slice(0, 10)}…`}
+                    >
+                        <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Verified
+                    </a>
+                ) : (
+                    <span className="flex-shrink-0 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 border border-slate-700 text-slate-500">
+                        Not Verified
+                    </span>
+                )
+            )}
+
             {/* Due date */}
             <span className={`flex-shrink-0 text-xs tabular-nums ${dueDateColor(task.dueDate)}`}>
                 {fmtDate(task.dueDate)}
@@ -209,6 +235,7 @@ function TaskRow({ task, onClick }: TaskRowProps) {
 
 export default function MyHome() {
     const { user } = useAuth();
+    const { account, logTaskCompletion } = useWeb3Context();
 
     // ── Task state ────────────────────────────────────────────────────────────
     const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
@@ -220,19 +247,42 @@ export default function MyHome() {
     const openTask  = useCallback((id: string) => setActiveTaskId(id), []);
     const closeTask = useCallback(() => setActiveTaskId(null), []);
 
-    // Optimistic move (no drag-and-drop for employees — status changes only from drawer)
+    // Status transition — task completion also fires an optional on-chain log.
+    // Web3 is fire-and-forget: failure never blocks or rolls back the DB update.
     const handleMove = useCallback(async (id: string, status: TaskStatus) => {
         setMovingIds(prev => new Set(prev).add(id));
         try {
+            // ── 1. Update status in backend (always, no MetaMask required) ────
             await updateTaskStatus(id, status);
-            // useTasks re-fetches on next render cycle — trigger via refetch if needed
             toast.success('Status updated');
+
+            // ── 2. On-chain log — only when marking completed ─────────────────
+            if (status === 'completed') {
+                void (async () => {
+                    if (!account) {
+                        // Wallet not connected — silently skip
+                        return;
+                    }
+
+                    // Call WorkforceLogger.logTaskCompletion(taskId) via MetaMask
+                    const txHash = await logTaskCompletion(id);
+
+                    if (!txHash) {
+                        // User rejected or contract unavailable — silent skip
+                        return;
+                    }
+
+                    // POST tx hash to our backend so the DB links task ↔ chain
+                    await postWeb3Log({ taskId: id, txHash, eventType: 'task_completed' });
+                    console.info('[MyHome] On-chain log recorded:', txHash);
+                })();
+            }
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update status');
         } finally {
             setMovingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
         }
-    }, []);
+    }, [account, logTaskCompletion]);
 
     // ── Performance state ─────────────────────────────────────────────────────
     const [score,    setScore]    = useState<ProductivityScore | null>(null);

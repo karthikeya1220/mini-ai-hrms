@@ -156,8 +156,35 @@ export function TaskCard({
                 {/* Left: assignee */}
                 <MiniAvatar name={assigneeName} />
 
-                {/* Right: due date + dropdown */}
+                {/* Right: verification badge · due date · dropdown */}
                 <div className="flex items-center gap-2 ml-auto">
+                    {/* Blockchain verification — show on completed tasks */}
+                    {task.status === 'completed' && (
+                        task.txHash ? (
+                            <a
+                                href={`https://amoy.polygonscan.com/tx/${task.txHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                                aria-label="Blockchain verified — view on PolygonScan"
+                                title={`Verified: ${task.txHash.slice(0, 10)}…`}
+                            >
+                                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Verified
+                            </a>
+                        ) : (
+                            <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-800 border border-slate-700 text-slate-500"
+                                title="No on-chain record for this task"
+                            >
+                                Not Verified
+                            </span>
+                        )
+                    )}
+
                     {task.dueDate && (
                         <span className={`text-[10px] font-medium tabular-nums ${dueDateStyle(task.dueDate)}`}>
                             {dueDateLabel(task.dueDate)}
