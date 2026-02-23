@@ -240,7 +240,7 @@ export default function DashboardPage() {
                             )}
                         </section>
 
-                        {/* ── On-chain activity log (preserved) ──────────────── */}
+                        {/* ── On-chain activity log (commented out — Web3 integration disabled) ──
                         {data.recentLogs.length > 0 && (
                             <section aria-label="Recent on-chain activity">
                                 <div className="flex items-center justify-between mb-3">
@@ -286,6 +286,7 @@ export default function DashboardPage() {
                                 </div>
                             </section>
                         )}
+                        ── end Web3 block ── */}
                     </>
                 ) : null}
             </main>

@@ -17,19 +17,19 @@
 //   • DnD moves status without opening a drawer.
 
 import { useState, useCallback, useDeferredValue } from 'react';
-import toast from 'react-hot-toast';
+// import toast from 'react-hot-toast'; // Web3 disabled (was used for on-chain toasts)
 import { useAuth } from '../context/AuthContext';
-import { useWeb3Context } from '../context/Web3Context';
+// import { useWeb3Context } from '../context/Web3Context'; // Web3 disabled
 import { useTasks } from '../hooks/useTasks';
 import { useEmployees } from '../hooks/useEmployees';
-import { client } from '../api/client';
+// import { client } from '../api/client'; // Web3 disabled (was used for /web3/log POST)
 import type { TaskStatus, TaskPriority } from '../api/tasks';
 import { NEXT_STATUS } from '../api/tasks';
 import { KanbanColumn } from '../components/tasks/KanbanColumn';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskModal } from '../components/tasks/TaskModal';
 import { TaskDetailDrawer } from '../components/tasks/TaskDetailDrawer';
-import { ConnectWalletButton } from '../components/ui/ConnectWalletButton';
+// import { ConnectWalletButton } from '../components/ui/ConnectWalletButton'; // Web3 disabled
 
 // ─── Priority filter pill ─────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ const COLUMNS: TaskStatus[] = ['assigned', 'in_progress', 'completed'];
 
 export default function TaskBoardPage() {
     const { isAdmin } = useAuth();
-    const { logTaskCompletion, account } = useWeb3Context();
+    // const { logTaskCompletion, account } = useWeb3Context(); // Web3 disabled
 
     // ── Task data ──────────────────────────────────────────────────────────────
     // Server automatically scopes GET /api/tasks to the authenticated employee's
@@ -160,9 +160,8 @@ export default function TaskBoardPage() {
             // ─── 1. Update status in backend (always, no MetaMask required) ──────
             await moveTask(id, newStatus);
 
-            // ─── 2 & 3. On-chain log (only when moving to "completed") ────────────
-            if (newStatus === 'completed') {
-                // Fire-and-forget — do NOT await in the critical path
+            // ─── 2 & 3. On-chain log (commented out — Web3 integration disabled) ──────────
+            /* if (newStatus === 'completed') {
                 void (async () => {
                     if (!account) {
                         console.info('[web3] Wallet not connected — skipping on-chain log.');
@@ -191,11 +190,11 @@ export default function TaskBoardPage() {
                         toast.error(`Tx confirmed but DB log failed: ${msg}`, { id: `web3-err-${id}` });
                     }
                 })();
-            }
+            } */
         } finally {
             setMovingIds(s => { const n = new Set(s); n.delete(id); return n; });
         }
-    }, [tasks, moveTask, logTaskCompletion, account]);
+    }, [tasks, moveTask]);
 
     // ── DnD handlers ──────────────────────────────────────────────────────────
     function handleDragOver(e: React.DragEvent, targetStatus: TaskStatus) {
@@ -259,7 +258,7 @@ export default function TaskBoardPage() {
                             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
                         </button>
 
-                        <ConnectWalletButton />
+                        {/* <ConnectWalletButton /> */}{/* Web3 disabled */}
 
                         {isAdmin && (
                             <button
@@ -283,12 +282,12 @@ export default function TaskBoardPage() {
                         <span className="text-xs text-slate-600 whitespace-nowrap">
                             {filteredTasks.length} of {total} task{total !== 1 ? 's' : ''}
                         </span>
-                        {account && (
+                        {/* {account && (
                             <span className="flex items-center gap-1 text-[10px] text-violet-400/70 border border-violet-500/20 bg-violet-500/5 rounded-full px-2 py-0.5 whitespace-nowrap">
                                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
                                 On-chain active
                             </span>
-                        )}
+                        )} */}{/* Web3 disabled */}
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
                         {PRIORITY_FILTERS.map(f => (
