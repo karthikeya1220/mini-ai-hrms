@@ -4,18 +4,17 @@
 //  ── Sticky header: breadcrumb + filter bar + "New task" button + ConnectWalletButton
 //  ── Three Kanban columns: Assigned | In Progress | Completed
 //  ── Each column accepts HTML5 DnD drops (forward-FSM-only)
-//  ── Each card also has a status dropdown for keyboard/touch users
-//  ── "New task" opens TaskModal slide-in drawer
-//  ── Employees are fetched to resolve assignee names and populate the
-//     "assign to" dropdown in the modal
+//  ── Clicking a card opens TaskDetailDrawer (single-overlay rule enforced)
+//  ── "New task" button opens TaskModal (create-only drawer)
 //
-// Web3 integration (optional — app works identically without MetaMask)
-// ─────────────────────────────────────────────────────────────────────
-//  When a task moves to "completed":
-//    1. Backend PUT /api/tasks/:id/status (always called, no MetaMask required)
-//    2. WorkforceLogger.logTaskCompletion(taskId) via MetaMask (if connected)
-//    3. POST /api/web3/log { taskId, txHash, eventType } (if step 2 succeeded)
-//  Steps 2–3 are fire-and-forget: failure does NOT block task completion.
+// Overlay state machine (single active drawer at a time):
+//   activeDrawer: 'task' | 'new' | null
+//   activeTaskId: string | null
+//
+// Rules:
+//   • Opening TaskDetailDrawer closes TaskModal and vice versa.
+//   • AI panel lives inside TaskDetailDrawer — never stacked on top.
+//   • DnD moves status without opening a drawer.
 
 import { useState, useCallback, useDeferredValue } from 'react';
 import toast from 'react-hot-toast';
@@ -29,6 +28,7 @@ import { NEXT_STATUS } from '../api/tasks';
 import { KanbanColumn } from '../components/tasks/KanbanColumn';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskModal } from '../components/tasks/TaskModal';
+import { TaskDetailDrawer } from '../components/tasks/TaskDetailDrawer';
 import { ConnectWalletButton } from '../components/ui/ConnectWalletButton';
 
 // ─── Priority filter pill ─────────────────────────────────────────────────────
@@ -94,7 +94,29 @@ export default function TaskBoardPage() {
     const employeeMap = new Map(employees.map(e => [e.id, e]));
 
     // ── UI state ──────────────────────────────────────────────────────────────
-    const [showModal, setShowModal] = useState(false);
+    // Single-overlay rule: only one drawer can be open at a time.
+    // 'new'  → TaskModal (create a task)
+    // 'task' → TaskDetailDrawer (view/act on a task)
+    // null   → nothing open
+    type ActiveDrawer = 'new' | 'task' | null;
+    const [activeDrawer, setActiveDrawer] = useState<ActiveDrawer>(null);
+    const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+    const openNewTask = useCallback(() => {
+        setActiveTaskId(null);
+        setActiveDrawer('new');
+    }, []);
+
+    const openTask = useCallback((id: string) => {
+        setActiveTaskId(id);
+        setActiveDrawer('task');
+    }, []);
+
+    const closeDrawer = useCallback(() => {
+        setActiveDrawer(null);
+        setActiveTaskId(null);
+    }, []);
+
     const [search, setSearch] = useState('');
     const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
 
@@ -242,7 +264,7 @@ export default function TaskBoardPage() {
                         {isAdmin && (
                             <button
                                 id="btn-new-task"
-                                onClick={() => setShowModal(true)}
+                                onClick={openNewTask}
                                 className="btn-primary text-xs gap-1.5 py-1.5"
                             >
                                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -317,6 +339,7 @@ export default function TaskBoardPage() {
                                             moving={movingIds.has(task.id)}
                                             onDragStart={id => setDraggingId(id)}
                                             onDragEnd={() => { setDraggingId(null); setDropTarget(null); }}
+                                            onOpen={openTask}
                                         />
                                     ))
                                 )}
@@ -326,14 +349,29 @@ export default function TaskBoardPage() {
                 </div>
             </main>
 
-            {/* ── Task modal ────────────────────────────────────────────────────── */}
-            {showModal && (
+            {/* ── Task create modal ─────────────────────────────────────────── */}
+            {activeDrawer === 'new' && (
                 <TaskModal
                     onSave={async data => { await addTask(data); }}
-                    onClose={() => setShowModal(false)}
+                    onClose={closeDrawer}
                     employees={employees}
                 />
             )}
+
+            {/* ── Task detail drawer (single overlay rule) ──────────────────── */}
+            {activeDrawer === 'task' && activeTaskId && (() => {
+                const task = tasks.find(t => t.id === activeTaskId);
+                if (!task) return null;
+                return (
+                    <TaskDetailDrawer
+                        task={task}
+                        assignee={task.assignedTo ? employeeMap.get(task.assignedTo) : undefined}
+                        onClose={closeDrawer}
+                        onMove={handleMove}
+                        moving={movingIds.has(task.id)}
+                    />
+                );
+            })()}
         </div>
     );
 }
