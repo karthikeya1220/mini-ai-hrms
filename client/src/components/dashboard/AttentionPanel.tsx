@@ -74,10 +74,10 @@ function AttentionCard({
             className={`
                 w-full text-left
                 rounded-xl border p-4
-                transition-all
-                bg-slate-900/60
+                bg-slate-900
                 flex flex-col gap-3
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+                transition-colors duration-150
                 ${isActive ? s.activeBorder : s.border}
             `}
             aria-pressed={isActive}
@@ -96,7 +96,7 @@ function AttentionCard({
 
             {/* Count */}
             <div>
-                <span className={`text-3xl font-extrabold tabular-nums ${s.count}`}>
+                <span className={`text-2xl font-bold tabular-nums ${s.count}`}>
                     {count}
                 </span>
             </div>
@@ -170,7 +170,7 @@ export function AttentionPanel({ data, onFilter, activeFilter }: AttentionPanelP
     return (
         <section aria-label="Attention items requiring action">
             <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">
+                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
                     Needs Attention
                 </h2>
                 {activeFilter && activeFilter !== ('none' as AttentionFilter) && (

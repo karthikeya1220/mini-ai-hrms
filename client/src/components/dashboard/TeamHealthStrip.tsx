@@ -17,7 +17,7 @@ interface StatTileProps {
 
 function StatTile({ label, value, sub, icon }: StatTileProps) {
     return (
-        <div className="flex items-center gap-3 flex-1 px-4 py-3 rounded-lg border border-slate-800 bg-slate-900/50 min-w-0">
+        <div className="flex items-center gap-3 flex-1 px-4 py-3 rounded-lg border border-slate-800 bg-slate-900 min-w-0">
             <span className="flex-shrink-0 text-slate-500">{icon}</span>
             <div className="min-w-0">
                 <p className="text-lg font-bold text-slate-100 tabular-nums leading-tight truncate">
@@ -72,7 +72,7 @@ export function TeamHealthStrip({ data }: TeamHealthStripProps) {
 
     return (
         <section aria-label="Team health summary">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-3">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
                 Team Health
             </h2>
             <div className="flex flex-col sm:flex-row gap-2">

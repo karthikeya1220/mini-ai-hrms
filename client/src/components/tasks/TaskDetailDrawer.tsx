@@ -188,7 +188,7 @@ export function TaskDetailDrawer({
                     bg-slate-900 border-l border-slate-800
                     shadow-2xl
                 "
-                style={{ animation: 'slideInRight 0.22s cubic-bezier(0.25,0.46,0.45,0.94)' }}
+                style={{ animation: 'slideInRight 0.22s ease both' }}
             >
                 {/* ── Header ── */}
                 <header className="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0">
@@ -337,10 +337,10 @@ export function TaskDetailDrawer({
                                 }}
                                 className="
                                     flex items-center gap-1.5 text-xs font-medium
-                                    text-brand-400 hover:text-brand-300
-                                    border border-brand-500/20 bg-brand-500/5
-                                    hover:bg-brand-500/10 hover:border-brand-500/40
-                                    px-3 py-1.5 rounded-lg transition-colors
+                                    text-indigo-400 hover:text-indigo-300
+                                    border border-indigo-500/20 bg-indigo-500/5
+                                    hover:bg-indigo-500/10 hover:border-indigo-500/40
+                                    px-3 py-1.5 rounded-lg transition-colors duration-150
                                 "
                             >
                                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

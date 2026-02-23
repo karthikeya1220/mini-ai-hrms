@@ -75,14 +75,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-4 py-16 relative overflow-hidden">
-      {/* Background glows */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-brand-600/10 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full bg-brand-800/10 blur-3xl" />
-      </div>
-
-      <div className="auth-card animate-slide-up relative z-10">
+    <div className="min-h-dvh flex items-center justify-center px-4 py-16">
+      <div className="auth-card animate-slide-up">
         {/* Header */}
         <LogoMark />
         <h1 className="text-2xl font-bold tracking-tight text-white mb-1">

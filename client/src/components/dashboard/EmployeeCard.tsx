@@ -117,10 +117,10 @@ export function EmployeeCard({ emp, onAssignTask, onViewDetails }: EmployeeCardP
             className="
                 flex flex-col gap-4
                 rounded-xl border border-slate-800
-                bg-slate-900/60
+                bg-slate-900
                 p-4
                 hover:border-slate-700
-                transition-colors
+                transition-colors duration-150
             "
             aria-label={`Employee card for ${emp.name}`}
         >
@@ -218,8 +218,8 @@ export function EmployeeCard({ emp, onAssignTask, onViewDetails }: EmployeeCardP
                         flex-1 py-1.5 rounded-lg
                         border border-slate-700
                         text-xs font-medium text-slate-300
-                        hover:border-indigo-500/60 hover:text-indigo-300 hover:bg-indigo-500/5
-                        transition-colors
+                        hover:border-indigo-500/40 hover:text-indigo-300 hover:bg-indigo-500/5
+                        transition-colors duration-150
                     "
                     aria-label={`Assign task to ${emp.name}`}
                 >
@@ -232,7 +232,7 @@ export function EmployeeCard({ emp, onAssignTask, onViewDetails }: EmployeeCardP
                         border border-slate-700
                         text-xs font-medium text-slate-300
                         hover:border-slate-500 hover:text-slate-100 hover:bg-slate-800
-                        transition-colors
+                        transition-colors duration-150
                     "
                     aria-label={`View details for ${emp.name}`}
                 >

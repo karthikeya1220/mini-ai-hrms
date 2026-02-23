@@ -40,7 +40,7 @@ function PriorityPill({ label, active, onClick }: { label: string; active: boole
         <button
             onClick={onClick}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active
-                ? 'bg-brand-500/20 border border-brand-500/40 text-brand-300'
+                ? 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
                 : 'border border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
                 }`}
         >
@@ -231,7 +231,7 @@ export default function TaskBoardPage() {
             {/* ── Page Header ───────────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-                    <h1 className="text-xl font-bold text-white">Task Board</h1>
+                    <h1 className="text-xl font-semibold text-white">Task Board</h1>
                     <div className="flex items-center gap-2">
                         {/* Search */}
                         <div className="relative hidden sm:block">
@@ -244,7 +244,7 @@ export default function TaskBoardPage() {
                                 placeholder="Search tasks…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/70 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 w-44 transition-all"
+                                className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/70 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 w-44 transition-all"
                             />
                         </div>
 

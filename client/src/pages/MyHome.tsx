@@ -122,7 +122,7 @@ function TrendBadge({ trend }: { trend: ProductivityScore['trend'] }) {
 
 function StatPill({ label, value }: { label: string; value: string }) {
     return (
-        <div className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700/50 min-w-[90px]">
+        <div className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 min-w-[90px]">
             <span className="text-base font-bold text-white tabular-nums">{value}</span>
             <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
         </div>
@@ -146,7 +146,7 @@ function WorkSummary({ tasks }: WorkSummaryProps) {
         <div className="flex flex-wrap gap-3 items-center">
             <StatPill label="Active" value={String(active.length)} />
             <StatPill label="Overdue" value={String(overdue.length)} />
-            <div className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+            <div className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wide">Next due</span>
                 <span className={`text-sm font-semibold tabular-nums ${upcoming ? dueDateColor(upcoming.dueDate) : 'text-slate-600'}`}>
                     {upcoming ? fmtDate(upcoming.dueDate) : 'None'}
@@ -171,9 +171,9 @@ function TaskRow({ task, onClick }: TaskRowProps) {
             className="
                 w-full flex items-center gap-3 px-4 py-3
                 rounded-xl border border-slate-800 bg-slate-900
-                hover:border-slate-700 hover:bg-slate-800/60
-                transition-colors text-left
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500
+                hover:border-slate-700 hover:bg-slate-800
+                transition-colors duration-150 text-left
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
             "
         >
             {/* Priority dot */}
@@ -279,7 +279,7 @@ export default function MyHome() {
 
             {/* ── Header ─────────────────────────────────────────────────────── */}
             <header>
-                <h1 className="text-2xl font-bold text-white tracking-tight">
+                <h1 className="text-2xl font-semibold text-white tracking-tight">
                     My Home
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">

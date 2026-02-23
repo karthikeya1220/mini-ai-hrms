@@ -74,7 +74,7 @@ function RolePill({ role }: { role: 'ADMIN' | 'EMPLOYEE' }) {
                 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
                 tracking-wide border select-none
                 ${isAdmin
-                    ? 'bg-brand-500/15 border-brand-500/30 text-brand-300'
+                    ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
                     : 'bg-slate-700/50 border-slate-600/50 text-slate-400'}
             `}
         >
@@ -129,7 +129,7 @@ export function AppNav({ currentPage, actions }: AppNavProps) {
 
                     {/* Brand */}
                     <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm flex items-center justify-center flex-shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
                             <LogoIcon />
                         </div>
                         <div className="hidden md:block">

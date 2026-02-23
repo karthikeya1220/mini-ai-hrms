@@ -26,7 +26,7 @@ export function Sidebar({ role }: SidebarProps) {
         <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen sticky top-0">
             <div className="p-6">
                 <div className="flex items-center gap-3 mb-8">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-white">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
                             <path d="M8 12h8M12 8v8" />
@@ -46,7 +46,7 @@ export function Sidebar({ role }: SidebarProps) {
                             className={({ isActive }) => `
                 flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all
                 ${isActive
-                                    ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
+                                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
                                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'}
               `}
                         >

@@ -140,7 +140,7 @@ export default function DashboardPage() {
             <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                        <h1 className="text-base font-bold text-white truncate">Admin Dashboard</h1>
+                        <h1 className="text-2xl font-semibold text-white tracking-tight truncate">Admin Dashboard</h1>
                         {updatedAt && (
                             <span className="hidden sm:inline text-xs text-slate-600">
                                 · updated {updatedAt}
@@ -189,7 +189,7 @@ export default function DashboardPage() {
                         <section aria-label="Employee list">
                             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">
+                                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
                                         Employees
                                     </h2>
                                     {activeFilter && activeFilter !== ('none' as AttentionFilter) && (
@@ -244,17 +244,14 @@ export default function DashboardPage() {
                         {data.recentLogs.length > 0 && (
                             <section aria-label="Recent on-chain activity">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">
+                                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
                                         On-chain Activity
                                     </h2>
                                     <span className="text-xs text-slate-600">Polygon Amoy</span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {data.recentLogs.map(log => (
-                                        <div
-                                            key={log.txHash}
-                                            className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-violet-500/30 transition-colors"
-                                        >
+                                        <div key={log.txHash} className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-violet-500/30 transition-colors duration-150">
                                             <div className="flex justify-between items-start mb-2">
                                                 <span className="p-1.5 rounded-lg bg-violet-500/10 text-violet-400">
                                                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

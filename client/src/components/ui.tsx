@@ -62,7 +62,7 @@ export function Spinner({ className = 'w-5 h-5' }: { className?: string }) {
 
 export function LogoMark() {
     return (
-        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-lg shadow-brand-500/30 mb-6">
+        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 mb-6">
             {/* Stylised HR / brain mark */}
             <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />

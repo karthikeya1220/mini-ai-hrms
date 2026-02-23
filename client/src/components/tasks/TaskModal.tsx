@@ -26,11 +26,11 @@ function SkillsInput({ value, onChange }: { value: string[]; onChange: (v: strin
     return (
         <div>
             <label htmlFor={uid} className="field-label">Required skills</label>
-            <div className="flex flex-wrap gap-1.5 min-h-[44px] rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all">
+            <div className="flex flex-wrap gap-1.5 min-h-[44px] rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
                 {value.map(s => (
-                    <span key={s} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-brand-500/15 border border-brand-500/30 text-xs text-brand-300">
+                    <span key={s} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-xs text-indigo-300">
                         {s}
-                        <button type="button" onClick={() => onChange(value.filter(x => x !== s))} className="ml-1 text-brand-400 hover:text-brand-200">×</button>
+                        <button type="button" onClick={() => onChange(value.filter(x => x !== s))} className="ml-1 text-indigo-400 hover:text-indigo-200">×</button>
                     </span>
                 ))}
                 <input
@@ -66,7 +66,7 @@ function ComplexityPicker({ value, onChange }: { value: number; onChange: (v: nu
                         className={`
               flex-1 py-2 rounded-lg border text-sm font-bold transition-all
               ${value === n
-                                ? 'border-brand-500 bg-brand-500/20 text-brand-300'
+                                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
                                 : 'border-slate-700 text-slate-600 hover:border-slate-600 hover:text-slate-400'
                             }
             `}
@@ -210,7 +210,7 @@ export function TaskModal({ onSave, onClose, employees }: Props) {
                                     className={`
                     flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-sm transition-all
                     ${priority === p.val
-                                            ? 'border-brand-500 bg-brand-500/20 text-brand-200 font-semibold'
+                                            ? 'border-indigo-500 bg-indigo-500/20 text-indigo-200 font-semibold'
                                             : 'border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-300'
                                         }
                   `}

@@ -19,46 +19,143 @@
 }
 
 @layer components {
+
   /* ── Input ──────────────────────────────────────────────────────────── */
   .input {
-    @apply w-full rounded-xl border border-slate-700 bg-slate-800/60
-           px-4 py-3 text-sm text-slate-100 placeholder-slate-500
-           outline-none transition-all duration-200
-           focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20
+    @apply w-full rounded-lg border border-slate-700 bg-slate-900
+           px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500
+           outline-none transition-colors duration-150
+           focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .input-error {
-    @apply border-red-500/70 focus:border-red-500 focus:ring-red-500/20;
+    @apply border-rose-500/70 focus:border-rose-500 focus:ring-rose-500/20;
   }
 
-  /* ── Button ─────────────────────────────────────────────────────────── */
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+
+  /* Primary — indigo, flat, no gradient, no glow */
   .btn-primary {
-    @apply relative w-full rounded-xl bg-gradient-to-r from-brand-600 to-brand-500
-           px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-500/25
-           transition-all duration-200
-           hover:from-brand-500 hover:to-brand-400 hover:shadow-brand-500/40 hover:-translate-y-0.5
-           active:translate-y-0 active:shadow-none
-           disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none;
+    @apply inline-flex items-center justify-center gap-2
+           rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white
+           transition-colors duration-150
+           hover:bg-indigo-600
+           active:bg-indigo-700
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  /* Secondary — subtle surface */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-lg bg-slate-800 border border-slate-700
+           px-4 py-2 text-sm font-medium text-slate-300
+           transition-colors duration-150
+           hover:bg-slate-700 hover:text-slate-100
+           active:bg-slate-600
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Ghost — text-only link-style */
   .btn-ghost {
-    @apply text-brand-400 hover:text-brand-300 text-sm font-medium transition-colors duration-150 underline-offset-4 hover:underline;
+    @apply inline-flex items-center gap-1.5
+           text-sm font-medium text-indigo-400
+           transition-colors duration-150
+           hover:text-indigo-300
+           underline-offset-4 hover:underline;
+  }
+
+  /* ── Card surface ────────────────────────────────────────────────────── */
+  .card {
+    @apply rounded-xl border border-slate-800 bg-slate-900 p-4
+           transition-colors duration-150;
+  }
+
+  .card-hover {
+    @apply card hover:border-slate-700;
   }
 
   /* ── Auth card ──────────────────────────────────────────────────────── */
   .auth-card {
-    @apply w-full max-w-md rounded-2xl border border-slate-800
-           bg-slate-900/80 backdrop-blur-xl p-8 shadow-2xl shadow-black/40;
+    @apply w-full max-w-md rounded-xl border border-slate-800
+           bg-slate-900 p-8 shadow-xl shadow-black/30;
   }
 
-  /* ── Label ──────────────────────────────────────────────────────────── */
+  /* ── Typography helpers ──────────────────────────────────────────────── */
+
+  /* Page-level heading (h1) */
+  .page-title {
+    @apply text-2xl font-semibold text-white tracking-tight;
+  }
+
+  /* Section heading */
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-widest text-slate-500;
+  }
+
+  /* Metadata / secondary text */
+  .meta-text {
+    @apply text-xs text-slate-400;
+  }
+
+  /* ── Form helpers ────────────────────────────────────────────────────── */
   .field-label {
-    @apply block text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1.5;
+    @apply block text-xs font-medium text-slate-400 mb-1.5;
   }
 
-  /* ── Error msg ──────────────────────────────────────────────────────── */
   .field-error {
-    @apply mt-1.5 text-xs text-red-400 flex items-center gap-1;
+    @apply mt-1.5 text-xs text-rose-400 flex items-center gap-1;
+  }
+
+  /* ── Empty state ─────────────────────────────────────────────────────── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center gap-3
+           py-16 rounded-xl border border-dashed border-slate-800
+           text-center;
+  }
+
+  /* ── Page layout ─────────────────────────────────────────────────────── */
+  .page-header {
+    @apply sticky top-0 z-10
+           border-b border-slate-800 bg-slate-950/90 backdrop-blur-md;
+  }
+
+  .page-header-inner {
+    @apply max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4;
+  }
+
+  .page-body {
+    @apply max-w-7xl mx-auto px-6 py-8;
+  }
+
+  /* ── Drawer / panel ──────────────────────────────────────────────────── */
+  .drawer-panel {
+    @apply fixed inset-y-0 right-0 z-50
+           w-full max-w-md flex flex-col
+           bg-slate-900 border-l border-slate-800 shadow-2xl;
+    animation: drawerSlideIn 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  .drawer-backdrop {
+    @apply fixed inset-0 z-40 bg-black/50 backdrop-blur-sm;
+    animation: fadeIn 180ms ease both;
+  }
+
+  /* ── Skeleton loader ─────────────────────────────────────────────────── */
+  .skeleton {
+    @apply rounded-lg bg-slate-800 animate-pulse;
+  }
+}
+
+/* ── Global keyframes ──────────────────────────────────────────────────────── */
+@layer utilities {
+  @keyframes drawerSlideIn {
+    from { transform: translateX(100%); opacity: 0.8; }
+    to   { transform: translateX(0);    opacity: 1;   }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 }

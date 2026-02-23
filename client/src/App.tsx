@@ -26,7 +26,7 @@ function GuestRoute() {
   if (isLoading) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-slate-950">
-        <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -107,7 +107,7 @@ export default function App() {
 
           {/* Toast notifications */}
           <Toaster
-            position="top-right"
+            position="bottom-right"
             toastOptions={{
               style: {
                 background: '#1e293b',   // slate-800

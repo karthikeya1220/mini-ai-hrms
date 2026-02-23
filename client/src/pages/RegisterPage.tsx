@@ -50,7 +50,7 @@ function strengthOf(pwd: string): { score: number; label: string; color: string 
         { score: 1, label: 'Weak', color: 'bg-red-500' },
         { score: 2, label: 'Fair', color: 'bg-amber-500' },
         { score: 3, label: 'Good', color: 'bg-emerald-500' },
-        { score: 4, label: 'Strong', color: 'bg-brand-500' },
+        { score: 4, label: 'Strong', color: 'bg-indigo-500' },
     ];
     return map[s] ?? map[0];
 }
@@ -104,14 +104,8 @@ export default function RegisterPage() {
     }
 
     return (
-        <div className="min-h-dvh flex items-center justify-center px-4 py-16 relative overflow-hidden">
-            {/* Background glows */}
-            <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute -top-60 -right-40 w-[600px] h-[600px] rounded-full bg-brand-700/10 blur-3xl" />
-                <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-brand-900/10 blur-3xl" />
-            </div>
-
-            <div className="auth-card animate-slide-up relative z-10">
+        <div className="min-h-dvh flex items-center justify-center px-4 py-16">
+            <div className="auth-card animate-slide-up">
                 {/* Header */}
                 <LogoMark />
                 <h1 className="text-2xl font-bold tracking-tight text-white mb-1">
@@ -164,7 +158,7 @@ export default function RegisterPage() {
                                         flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium
                                         transition-all duration-150
                                         ${role === r
-                                            ? 'border-brand-500 bg-brand-500/10 text-brand-300'
+                                            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
                                             : 'border-slate-700 bg-slate-900/50 text-slate-400 hover:border-slate-600 hover:text-slate-300'}
                                     `}
                                 >

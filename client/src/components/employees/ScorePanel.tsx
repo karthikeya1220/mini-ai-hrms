@@ -60,7 +60,7 @@ function BreakdownBar({ label, value, max = 1 }: { label: string; value: number;
             </div>
             <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
                 <div
-                    className="h-full rounded-full bg-brand-500 transition-all duration-700"
+                    className="h-full rounded-full bg-indigo-500 transition-all duration-700"
                     style={{ width: `${pct}%` }}
                 />
             </div>
@@ -95,7 +95,7 @@ function SkillGapSection({ employeeId }: { employeeId: string }) {
         <section className="rounded-xl border border-slate-800 bg-slate-800/20 p-4 space-y-3">
             <div className="flex justify-between items-center">
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Skill Gap Analysis</h3>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                     {Math.round(gap.coverageRate * 100)}% Coverage
                 </span>
             </div>
@@ -162,7 +162,7 @@ export function ScorePanel({ employee, onClose }: Props) {
                 aria-modal
                 aria-label={`Productivity score — ${employee.name}`}
                 className="fixed inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col bg-slate-900 border-l border-slate-800 shadow-2xl"
-                style={{ animation: 'slideInRight 0.25s cubic-bezier(0.25,0.46,0.45,0.94)' }}
+                style={{ animation: 'slideInRight 0.22s ease both' }}
             >
                 {/* Header */}
                 <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800">

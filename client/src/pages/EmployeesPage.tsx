@@ -138,7 +138,7 @@ function FilterPill({
         <button
             onClick={onClick}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active
-                ? 'bg-brand-500/20 border border-brand-500/40 text-brand-300'
+                ? 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
                 : 'border border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
                 }`}
         >
@@ -215,7 +215,7 @@ export default function EmployeesPage() {
             {/* ── Page Header ────────────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-white">Employees</h1>
+                    <h1 className="text-2xl font-semibold text-white">Employees</h1>
                     <button
                         id="btn-add-employee"
                         onClick={() => { setSelected(null); setModal('add'); }}
@@ -234,7 +234,7 @@ export default function EmployeesPage() {
                 {/* Page heading */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Employees</h1>
+                        <h1 className="text-2xl font-semibold text-white tracking-tight">Employees</h1>
                         <p className="text-sm text-slate-500 mt-1">
                             {total} total · {employees.filter(e => e.isActive).length} active
                         </p>
@@ -253,7 +253,7 @@ export default function EmployeesPage() {
                                 placeholder="Search name, role, skills…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-9 pr-4 py-2 rounded-xl border border-slate-800 bg-slate-900/70 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 w-60 transition-all"
+                                className="pl-9 pr-4 py-2 rounded-xl border border-slate-800 bg-slate-900/70 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 w-60 transition-all"
                             />
                         </div>
 
@@ -345,7 +345,7 @@ export default function EmployeesPage() {
 
                                                 {/* Email */}
                                                 <td className="px-4 py-3.5 text-slate-400 truncate max-w-[180px]">
-                                                    <a href={`mailto:${emp.email}`} className="hover:text-brand-300 transition-colors">
+                                                    <a href={`mailto:${emp.email}`} className="hover:text-indigo-300 transition-colors">
                                                         {emp.email}
                                                     </a>
                                                 </td>
@@ -368,7 +368,7 @@ export default function EmployeesPage() {
                                                 <td className="px-4 py-3.5">
                                                     <div className="flex flex-wrap gap-1 max-w-[160px]">
                                                         {emp.skills.slice(0, 3).map(s => (
-                                                            <span key={s} className="text-xs px-2 py-0.5 rounded-md bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                                                            <span key={s} className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                                                                 {s}
                                                             </span>
                                                         ))}
@@ -400,7 +400,7 @@ export default function EmployeesPage() {
                                                         <button
                                                             id={`btn-score-${emp.id}`}
                                                             onClick={() => navigate(`/insights?employeeId=${emp.id}`)}
-                                                            className="p-1.5 rounded-lg text-slate-600 hover:text-brand-400 hover:bg-brand-500/10 transition-all"
+                                                            className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors duration-150"
                                                             title="View AI insights"
                                                         >
                                                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -452,7 +452,7 @@ export default function EmployeesPage() {
                             {filtered.length < total && (
                                 <button
                                     onClick={() => refetch()}
-                                    className="text-brand-400 hover:text-brand-300 transition-colors"
+                                    className="text-indigo-400 hover:text-indigo-300 transition-colors"
                                 >
                                     Load more
                                 </button>
