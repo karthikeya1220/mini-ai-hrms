@@ -9,6 +9,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { sendError } from '../utils/response';
+import { ensureConnected } from '../lib/prisma';
 
 // Minimal structured logger (swap for winston/pino in production)
 function logError(err: unknown): void {
@@ -54,7 +55,15 @@ export function errorHandler(
         return;
     }
 
-    // 3. Unexpected errors — never leak internals to caller
+    // 3. Transient Neon wake error — kick the connection and tell client to retry
+    if (err instanceof Error && (err.message.includes("Can't reach database") || err.message.includes('connect ECONNRESET'))) {
+        console.warn('[errorHandler] Neon cold-wake detected — pinging DB to wake it');
+        void ensureConnected().catch(() => { /* ignore */ });
+        sendError(res, 503, 'DB_UNAVAILABLE', 'Database is waking up, please retry in a few seconds.');
+        return;
+    }
+
+    // 4. Unexpected errors — never leak internals to caller
     sendError(
         res,
         500,

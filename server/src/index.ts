@@ -14,7 +14,7 @@
 import 'dotenv/config'; // side-effect import — populates process.env from .env
 
 import { createApp } from './app';
-import prisma from './lib/prisma';
+import prisma, { ensureConnected } from './lib/prisma';
 import { initRedis, disconnectRedis } from './lib/redis';
 import { initScoringQueue, closeScoringQueue } from './lib/scoringQueue';
 
@@ -40,6 +40,20 @@ if (!process.env.PORT) {
 const PORT = parseInt(process.env.PORT, 10);
 
 async function main(): Promise<void> {
+    // ── Warm the Neon connection before the first request arrives ─────────────
+    // Neon free-tier suspends after ~5 min of inactivity. The first Prisma
+    // query after cold wake fails; ensureConnected() retries once after 4 s so
+    // the DB is ready by the time we start serving HTTP traffic.
+    try {
+        await ensureConnected();
+        console.log('[server] DB connection established');
+    } catch (dbErr) {
+        // Non-fatal: log the warning but keep the server running.
+        // Individual request handlers will hit the error and surface it via the
+        // normal error-handler middleware.
+        console.warn('[server] DB warm-up failed (will retry on first request):', dbErr);
+    }
+
     const app = createApp();
 
     const server = app.listen(PORT, () => {

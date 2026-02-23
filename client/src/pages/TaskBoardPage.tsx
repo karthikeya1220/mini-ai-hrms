@@ -22,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWeb3Context } from '../context/Web3Context';
 import { useTasks } from '../hooks/useTasks';
 import { useEmployees } from '../hooks/useEmployees';
-import { postWeb3Log } from '../api/web3';
+import { client } from '../api/client';
 import type { TaskStatus, TaskPriority } from '../api/tasks';
 import { NEXT_STATUS } from '../api/tasks';
 import { KanbanColumn } from '../components/tasks/KanbanColumn';
@@ -165,30 +165,30 @@ export default function TaskBoardPage() {
                 // Fire-and-forget — do NOT await in the critical path
                 void (async () => {
                     if (!account) {
-                        // Wallet not connected — silently skip on-chain log
+                        console.info('[web3] Wallet not connected — skipping on-chain log.');
                         return;
                     }
 
                     // 2. Call WorkforceLogger.logTaskCompletion() via MetaMask
+                    console.info('[web3] Requesting MetaMask tx for task:', id);
                     const txHash = await logTaskCompletion(id);
 
                     if (!txHash) {
-                        // User rejected or contract unavailable — silent skip
+                        toast.error('On-chain log skipped — check MetaMask or contract address.', { id: `web3-skip-${id}` });
                         return;
                     }
 
                     // 3. Record the tx_hash in our backend off-chain DB
-                    const logged = await postWeb3Log({
-                        taskId: id,
-                        txHash,
-                        eventType: 'task_completed',
-                    });
-
-                    if (logged) {
+                    try {
+                        await client.post('/web3/log', { taskId: id, txHash, eventType: 'task_completed' });
                         toast.success(
-                            `⛓ On-chain log recorded\n${txHash.slice(0, 10)}…`,
-                            { duration: 5000, id: `web3-${id}` },
+                            `⛓ Verified on-chain\n${txHash.slice(0, 10)}…`,
+                            { duration: 5000, id: `web3-ok-${id}` },
                         );
+                    } catch (logErr: unknown) {
+                        const msg = logErr instanceof Error ? logErr.message : String(logErr);
+                        console.error('[web3] POST /web3/log failed:', logErr);
+                        toast.error(`Tx confirmed but DB log failed: ${msg}`, { id: `web3-err-${id}` });
                     }
                 })();
             }

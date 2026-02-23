@@ -25,7 +25,7 @@ import { getEmployeeScore, getSkillGap } from '../api/employees';
 import type { ProductivityScore, SkillGap } from '../api/employees';
 import type { Task, TaskStatus } from '../api/tasks';
 import { updateTaskStatus } from '../api/tasks';
-import { postWeb3Log } from '../api/web3';
+import { client } from '../api/client';
 import { TaskDetailDrawer } from '../components/tasks/TaskDetailDrawer';
 import toast from 'react-hot-toast';
 
@@ -238,7 +238,7 @@ export default function MyHome() {
     const { account, logTaskCompletion } = useWeb3Context();
 
     // ── Task state ────────────────────────────────────────────────────────────
-    const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
+    const { tasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useTasks();
 
     // ── Drawer overlay ────────────────────────────────────────────────────────
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -253,28 +253,54 @@ export default function MyHome() {
         setMovingIds(prev => new Set(prev).add(id));
         try {
             // ── 1. Update status in backend (always, no MetaMask required) ────
-            await updateTaskStatus(id, status);
+            const updated = await updateTaskStatus(id, status);
             toast.success('Status updated');
 
-            // ── 2. On-chain log — only when marking completed ─────────────────
+            // ── 2. Sync server response into local state immediately ──────────
+            // This prevents the drawer from showing a stale "Move to →" button
+            // after the transition, which would cause a 422 on a second click.
+            // Also picks up server-stamped fields: completedAt, txHash.
+            refetchTasks();
+            // Keep the drawer open on the updated task — close only if the
+            // server returned a different id (shouldn't happen, but be safe).
+            if (updated.id !== id) closeTask();
+
+            // ── 3. On-chain log — only when marking completed ─────────────────
             if (status === 'completed') {
                 void (async () => {
                     if (!account) {
-                        // Wallet not connected — silently skip
+                        console.info('[web3] Wallet not connected — skipping on-chain log.');
                         return;
                     }
 
                     // Call WorkforceLogger.logTaskCompletion(taskId) via MetaMask
+                    console.info('[web3] Requesting MetaMask tx for task:', id);
                     const txHash = await logTaskCompletion(id);
 
                     if (!txHash) {
-                        // User rejected or contract unavailable — silent skip
+                        // logTaskCompletion already console.warns on failure
+                        toast.error('On-chain log skipped — check MetaMask or contract address.', { id: `web3-skip-${id}` });
                         return;
                     }
 
+                    console.info('[web3] Tx confirmed, posting to server:', txHash);
+
                     // POST tx hash to our backend so the DB links task ↔ chain
-                    await postWeb3Log({ taskId: id, txHash, eventType: 'task_completed' });
-                    console.info('[MyHome] On-chain log recorded:', txHash);
+                    try {
+                        const res = await client.post<{ success: true; data: object }>('/web3/log', {
+                            taskId: id,
+                            txHash,
+                            eventType: 'task_completed',
+                        });
+                        console.info('[web3] blockchain_log created:', res.data);
+                        toast.success(`⛓ Verified on-chain\n${txHash.slice(0, 10)}…`, { duration: 5000, id: `web3-ok-${id}` });
+                        // Refresh to show the green Verified badge
+                        refetchTasks();
+                    } catch (logErr: unknown) {
+                        const msg = logErr instanceof Error ? logErr.message : String(logErr);
+                        console.error('[web3] POST /web3/log failed:', logErr);
+                        toast.error(`Tx confirmed but DB log failed: ${msg}`, { id: `web3-err-${id}` });
+                    }
                 })();
             }
         } catch (err) {
@@ -282,7 +308,7 @@ export default function MyHome() {
         } finally {
             setMovingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
         }
-    }, [account, logTaskCompletion]);
+    }, [account, logTaskCompletion, closeTask, refetchTasks]);
 
     // ── Performance state ─────────────────────────────────────────────────────
     const [score,    setScore]    = useState<ProductivityScore | null>(null);
