@@ -16,7 +16,7 @@ import { FloatingInput, LogoMark, Spinner, EyeIcon } from '../components/ui';
 // The `from` state (set by ProtectedRoute when redirecting to /login) is still
 // respected so a deep-link like /employees that an admin bookmarked works fine.
 function defaultLanding(role: 'ADMIN' | 'EMPLOYEE' | undefined): string {
-  return role === 'EMPLOYEE' ? '/tasks' : '/dashboard';
+  return role === 'EMPLOYEE' ? '/my' : '/dashboard';
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

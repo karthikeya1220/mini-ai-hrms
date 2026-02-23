@@ -13,6 +13,9 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EmployeesPage from './pages/EmployeesPage';
 import TaskBoardPage from './pages/TaskBoardPage';
+import { AdminLayout } from './components/layout/AdminLayout';
+import { EmployeeLayout } from './components/layout/EmployeeLayout';
+import MyPerformancePage from './pages/MyPerformancePage';
 
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from /login and /register.
@@ -37,27 +40,38 @@ function GuestRoute() {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 function AppRouter() {
+  const { isAdmin } = useAuth();
+
   return (
     <Routes>
       {/* Root → dashboard (or login if not authed) */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to={isAdmin ? "/dashboard" : "/my"} replace />} />
 
       {/* Guest-only — redirect to dashboard if already signed in */}
       <Route element={<GuestRoute />}>
-        <Route path="/login"    element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       {/* Protected — redirect to /login if not signed in */}
       <Route element={<ProtectedRoute />}>
-        {/* Admin-only — redirect to /tasks if signed in but not admin */}
-        <Route element={<ProtectedRoute requireAdmin />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/employees" element={<EmployeesPage />} />
+
+        {/* Admin Routes */}
+        <Route element={<AdminLayout />}>
+          <Route element={<ProtectedRoute requireAdmin />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/employees" element={<EmployeesPage />} />
+            <Route path="/tasks" element={<TaskBoardPage />} />
+          </Route>
         </Route>
 
-        {/* Everyone (Admin & Employee) routes */}
-        <Route path="/tasks" element={<TaskBoardPage />} />
+        {/* Employee Routes (Non-admins redirected to /my) */}
+        {!isAdmin && (
+          <Route element={<EmployeeLayout />}>
+            <Route path="/my" element={<MyPerformancePage />} />
+            <Route path="/tasks" element={<TaskBoardPage />} />
+          </Route>
+        )}
       </Route>
 
       {/* 404 fallback */}
@@ -95,11 +109,11 @@ export default function App() {
             position="top-right"
             toastOptions={{
               style: {
-                background:   '#1e293b',   // slate-800
-                color:        '#f1f5f9',   // slate-100
-                border:       '1px solid #334155',  // slate-700
+                background: '#1e293b',   // slate-800
+                color: '#f1f5f9',   // slate-100
+                border: '1px solid #334155',  // slate-700
                 borderRadius: '12px',
-                fontSize:     '14px',
+                fontSize: '14px',
               },
               success: {
                 iconTheme: { primary: '#6366f1', secondary: '#fff' },

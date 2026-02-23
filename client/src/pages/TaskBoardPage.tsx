@@ -30,7 +30,6 @@ import { KanbanColumn } from '../components/tasks/KanbanColumn';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskModal } from '../components/tasks/TaskModal';
 import { ConnectWalletButton } from '../components/ui/ConnectWalletButton';
-import { AppNav } from '../components/layout/AppNav';
 
 // ─── Priority filter pill ─────────────────────────────────────────────────────
 
@@ -158,7 +157,7 @@ export default function TaskBoardPage() {
 
                     // 3. Record the tx_hash in our backend off-chain DB
                     const logged = await postWeb3Log({
-                        taskId:    id,
+                        taskId: id,
                         txHash,
                         eventType: 'task_completed',
                     });
@@ -199,19 +198,19 @@ export default function TaskBoardPage() {
     }
 
     const PRIORITY_FILTERS: { val: PriorityFilter; label: string }[] = [
-        { val: 'all',    label: 'All' },
-        { val: 'high',   label: '🔴 High' },
+        { val: 'all', label: 'All' },
+        { val: 'high', label: '🔴 High' },
         { val: 'medium', label: '🟡 Medium' },
-        { val: 'low',    label: '⚪ Low' },
+        { val: 'low', label: '⚪ Low' },
     ];
 
     return (
         <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col">
-            {/* ── Top nav ───────────────────────────────────────────────────────── */}
-            <AppNav
-                currentPage="tasks"
-                actions={
-                    <>
+            {/* ── Page Header ───────────────────────────────────────────────────────── */}
+            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+                    <h1 className="text-xl font-bold text-white">Task Board</h1>
+                    <div className="flex items-center gap-2">
                         {/* Search */}
                         <div className="relative hidden sm:block">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -229,41 +228,35 @@ export default function TaskBoardPage() {
 
                         {/* Refresh */}
                         <button
+                            id="btn-tasks-refresh"
                             onClick={refetch}
                             disabled={loading}
-                            className="p-2 rounded-lg border border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-all disabled:opacity-40"
-                            title="Refresh"
+                            className="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 transition-all disabled:opacity-40"
+                            title="Refresh board"
                         >
-                            <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                            </svg>
+                            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
                         </button>
 
-                        <ConnectWalletButton compact />
+                        <ConnectWalletButton />
 
-                        {/* New task — admin only */}
                         {isAdmin && (
                             <button
                                 id="btn-new-task"
                                 onClick={() => setShowModal(true)}
-                                className="btn-primary text-sm gap-1.5"
+                                className="btn-primary text-xs gap-1.5 py-1.5"
                             >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                                </svg>
-                                New task
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                <span>New task</span>
                             </button>
                         )}
-                    </>
-                }
-            />
+                    </div>
+                </div>
+            </header>
 
             {/* Sub-header: board title + on-chain indicator + priority filters */}
             <div className="border-b border-slate-900 bg-slate-950/90 backdrop-blur-md sticky top-16 z-10">
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-sm font-bold text-white">Task Board</h1>
                         <span className="text-xs text-slate-600">
                             {filteredTasks.length} of {total} task{total !== 1 ? 's' : ''}
                         </span>

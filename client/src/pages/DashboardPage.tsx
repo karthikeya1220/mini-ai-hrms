@@ -11,7 +11,6 @@ import { useDashboard } from '../hooks/useDashboard';
 import { StatCard } from '../components/dashboard/StatCard';
 import { CompletionChart } from '../components/dashboard/CompletionChart';
 import { ScoreBadge } from '../components/dashboard/ScoreBadge';
-import { AppNav } from '../components/layout/AppNav';
 
 // ─── SVG icon helpers ────────────────────────────────────────────────────────
 
@@ -146,13 +145,13 @@ export default function DashboardPage() {
 
     return (
         <div className="min-h-dvh bg-slate-950 text-slate-100">
-            {/* ── Top nav ──────────────────────────────────────────────────────────── */}
-            <AppNav
-                currentPage="dashboard"
-                actions={
-                    <>
+            {/* ── Page Header ──────────────────────────────────────────────────────────── */}
+            <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                    <h1 className="text-xl font-bold text-white">Dashboard</h1>
+                    <div className="flex items-center gap-3">
                         {updatedAt && (
-                            <span className="hidden sm:inline text-xs text-slate-600 mr-1">
+                            <span className="hidden sm:inline text-xs text-slate-600">
                                 Updated {updatedAt}
                             </span>
                         )}
@@ -161,14 +160,13 @@ export default function DashboardPage() {
                             onClick={refetch}
                             disabled={loading}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400 hover:border-slate-700 hover:text-slate-200 transition-all disabled:opacity-40"
-                            title="Refresh dashboard"
                         >
                             <span className={loading ? 'animate-spin' : ''}>{icons.refresh}</span>
                             <span className="hidden sm:inline">Refresh</span>
                         </button>
-                    </>
-                }
-            />
+                    </div>
+                </div>
+            </header>
 
             {/* ── Main ─────────────────────────────────────────────────────────────── */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">

@@ -95,7 +95,7 @@ export default function RegisterPage() {
             const loggedInUser = await login(email, password);
             toast.success('Welcome to mini-AI HRMS! 🎉', { duration: 4000 });
             // Route to the right landing page based on the actual role in the JWT
-            navigate(loggedInUser.role === 'EMPLOYEE' ? '/tasks' : '/dashboard', { replace: true });
+            navigate(loggedInUser.role === 'EMPLOYEE' ? '/my' : '/dashboard', { replace: true });
         } catch (err: unknown) {
             setApiError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
         } finally {

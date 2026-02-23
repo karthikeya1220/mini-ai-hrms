@@ -46,9 +46,9 @@ export function ProtectedRoute({ requireAdmin = false }: ProtectedRouteProps) {
         return <Navigate to="/login" state={{ from: location.pathname }} replace />;
     }
 
-    // Logged in but not an admin when admin is required → kick to /tasks.
+    // Logged in but not an admin when admin is required → kick to /my.
     if (requireAdmin && !isAdmin) {
-        return <Navigate to="/tasks" replace />;
+        return <Navigate to="/my" replace />;
     }
 
     return <Outlet />;
