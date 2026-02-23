@@ -10,7 +10,8 @@ import { client } from './client';
 export interface EmployeeStat {
     employeeId: string;
     name: string;
-    role: string | null;
+    /** Free-text job title — NOT the RBAC role (see User.role = ADMIN | EMPLOYEE). */
+    jobTitle: string | null;
     department: string | null;
     isActive: boolean;
     tasksAssigned: number;

@@ -32,8 +32,8 @@ export function KanbanColumn({
         <div className="flex flex-col min-w-[300px] w-full">
             {/* Column header */}
             <div className="flex items-center gap-2 px-1 mb-3">
-                <span className={`${status === 'in_progress' ? 'text-indigo-400'
-                        : status === 'completed' ? 'text-emerald-400'
+                <span className={`${status === 'IN_PROGRESS' ? 'text-indigo-400'
+                        : status === 'COMPLETED' ? 'text-emerald-400'
                             : 'text-slate-500'
                     }`}>
                     {meta.icon}

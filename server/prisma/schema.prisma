@@ -34,6 +34,24 @@ enum Role {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TASK STATUS ENUM
+// Replaces the unconstrained VARCHAR(20) used on Task.status.
+// Enforced at the Postgres type level — invalid status values are rejected
+// at the DB layer, not just at the application layer.
+//
+// FSM (forward-only — enforced in task.service.ts):
+//   ASSIGNED → IN_PROGRESS → COMPLETED
+//   COMPLETED is terminal — no further transitions allowed.
+//
+// Migration: 20260223000004_task_status_enum
+// ─────────────────────────────────────────────────────────────────────────────
+enum TaskStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ORGANIZATIONS  (Tenants)
 // SPEC: organizations table
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,24 +162,29 @@ model Employee {
 // TASKS
 // SPEC: tasks table
 //   - priority:          VARCHAR(20) DEFAULT 'medium'  — low | medium | high
-//   - status:            VARCHAR(20) DEFAULT 'assigned' — assigned | in_progress | completed
+//   - status:            TaskStatus enum DEFAULT ASSIGNED — ASSIGNED | IN_PROGRESS | COMPLETED
 //   - complexity_score:  INTEGER DEFAULT 3             — 1 (simple) to 5 (complex)
 //   - required_skills:   TEXT[]
 //   - due_date / completed_at: optional
 // ─────────────────────────────────────────────────────────────────────────────
 model Task {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId           String    @map("org_id") @db.Uuid
-  assignedTo      String?   @map("assigned_to") @db.Uuid
-  title           String    @db.VarChar(255)
-  description     String?   @db.Text
-  priority        String    @default("medium") @db.VarChar(20)
-  status          String    @default("assigned") @db.VarChar(20)
-  complexityScore Int       @default(3) @map("complexity_score")
-  requiredSkills  String[]  @map("required_skills")
-  dueDate         DateTime? @map("due_date") @db.Timestamptz()
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz()
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId           String     @map("org_id") @db.Uuid
+  assignedTo      String?    @map("assigned_to") @db.Uuid
+  title           String     @db.VarChar(255)
+  description     String?    @db.Text
+  priority        String     @default("medium") @db.VarChar(20)
+  status          TaskStatus @default(ASSIGNED)
+  complexityScore Int        @default(3) @map("complexity_score")
+  requiredSkills  String[]   @map("required_skills")
+  dueDate         DateTime?  @map("due_date") @db.Timestamptz()
+  completedAt     DateTime?  @map("completed_at") @db.Timestamptz()
+  // Soft-delete flag — DELETE /tasks/:id sets this to false.
+  // All read queries filter isActive = true so deleted tasks are invisible
+  // to the application while their blockchain_logs / performance data are
+  // preserved for audit purposes.
+  isActive        Boolean    @default(true) @map("is_active")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz()
 
   // FK: org_id → organizations(id) ON DELETE CASCADE
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -182,6 +205,9 @@ model Task {
 
   // Performance: (org_id, status) lookup for dashboard aggregates
   @@index([orgId, status])
+  // Soft-delete: include isActive in the primary tenant lookup so the planner
+  // can use an index-only scan for the WHERE org_id = ? AND is_active = true pattern.
+  @@index([orgId, isActive], name: "idx_tasks_org_active")
 
   @@map("tasks")
 }
@@ -189,19 +215,27 @@ model Task {
 // ─────────────────────────────────────────────────────────────────────────────
 // PERFORMANCE LOGS  (AI-generated scores)
 // SPEC: performance_logs table
-//   - score:     NUMERIC(5,2)  — e.g. 84.50
-//   - breakdown: JSONB         — { completionRate, onTimeRate, avgComplexity, … }
-// Non-SPEC addition (CRITICAL-1 fix from architecture audit):
-//   - org_id: added to enable defence-in-depth tenant scoping on every query.
-//     Backfill SQL in migration 0002_add_org_id_to_performance_logs.
+//
+// Schema change (migration: 20260223000006_perf_log_flat_columns):
+//   - score:          DOUBLE PRECISION (was DECIMAL(5,2))
+//   - completionRate: DOUBLE PRECISION (extracted from legacy breakdown JSONB)
+//   - onTimeRate:     DOUBLE PRECISION (extracted from legacy breakdown JSONB)
+//   - avgComplexity:  DOUBLE PRECISION (extracted from legacy breakdown JSONB)
+//   - breakdown JSONB dropped — factors are now first-class typed columns
+//   - computedAt renamed to createdAt
+//
+// Org-id addition (CRITICAL-1 fix from architecture audit):
+//   - orgId: defence-in-depth tenant scoping on every query.
 // ─────────────────────────────────────────────────────────────────────────────
 model PerformanceLog {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId      String   @map("org_id") @db.Uuid
-  employeeId String   @map("employee_id") @db.Uuid
-  score      Decimal? @db.Decimal(5, 2)
-  breakdown  Json?    // maps to JSONB in PostgreSQL
-  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz()
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  employeeId     String   @map("employee_id") @db.Uuid
+  score          Float?
+  completionRate Float?   @map("completion_rate")
+  onTimeRate     Float?   @map("on_time_rate")
+  avgComplexity  Float?   @map("avg_complexity")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   // FK: org_id → organizations(id) ON DELETE CASCADE
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -209,16 +243,10 @@ model PerformanceLog {
   // FK: employee_id → employees(id) ON DELETE CASCADE
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  // SPEC: CREATE INDEX idx_perf_employee ON performance_logs(employee_id)
-  @@index([employeeId], name: "idx_perf_employee")
-  // Tenant-only lookups (invalidation, audit scans)
+  // Primary query pattern: latest score per employee, trend history
+  @@index([employeeId, createdAt(sort: Desc)], name: "idx_perf_employee_date")
+  // Tenant-only lookups (cache invalidation, audit scans)
   @@index([orgId], name: "idx_perf_org")
-  // Primary query pattern: WHERE org_id = ? AND employee_id = ? ORDER BY computed_at DESC
-  // Covers date-ranged score history and latest-score lookups without a heap scan.
-  @@index([orgId, employeeId, computedAt(sort: Desc)], name: "idx_perf_org_employee_date")
-
-  // Performance: score trend/history lookups for a specific employee
-  @@index([employeeId, computedAt(sort: Desc)])
 
   @@map("performance_logs")
 }

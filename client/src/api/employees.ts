@@ -13,7 +13,8 @@ export interface Employee {
     id: string;
     name: string;
     email: string;
-    role: string | null;
+    /** Free-text job title (e.g. "Senior Engineer"). NOT the RBAC role — see UserInfo.role. */
+    jobTitle: string | null;
     department: string | null;
     skills: string[];
     isActive: boolean;
@@ -30,7 +31,8 @@ export interface PaginatedEmployees {
 export interface EmployeeInput {
     name: string;
     email: string;
-    role?: string;
+    /** Free-text job title — NOT the RBAC role. */
+    jobTitle?: string;
     department?: string;
     skills?: string[];
     walletAddress?: string;
@@ -70,7 +72,8 @@ export interface SkillGap {
 
 export interface ListParams {
     department?: string;
-    role?: string;
+    /** Filter by free-text job title. Maps to employees.job_title on the server. */
+    jobTitle?: string;
     isActive?: 'true' | 'false';
     limit?: number;
     cursor?: string;
@@ -79,10 +82,10 @@ export interface ListParams {
 export async function listEmployees(params: ListParams = {}): Promise<PaginatedEmployees> {
     const qs = new URLSearchParams();
     if (params.department) qs.set('department', params.department);
-    if (params.role) qs.set('role', params.role);
-    if (params.isActive) qs.set('isActive', params.isActive);
-    if (params.limit) qs.set('limit', String(params.limit));
-    if (params.cursor) qs.set('cursor', params.cursor);
+    if (params.jobTitle)   qs.set('jobTitle', params.jobTitle);
+    if (params.isActive)   qs.set('isActive', params.isActive);
+    if (params.limit)      qs.set('limit', String(params.limit));
+    if (params.cursor)     qs.set('cursor', params.cursor);
     const query = qs.toString() ? `?${qs}` : '';
     const res = await client.get<{ success: true; data: PaginatedEmployees }>(`/employees${query}`);
     return res.data.data;

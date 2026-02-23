@@ -29,6 +29,9 @@ import {
     getScoreHandler,
     recommendHandler,
     skillGapHandler,
+    geminiSkillGapHandler,
+    geminiRecommendHandler,
+    geminiTrendHandler,
 } from '../controllers/ai.controller';
 import { analyzeHandler } from '../controllers/gemini.controller';
 
@@ -56,6 +59,35 @@ router.get('/skill-gap/:employeeId',
     authMiddleware,
     authorizeOwnerOrAdmin('employeeId'),
     skillGapHandler,
+);
+
+// ── GET /api/ai/gemini/skill-gap/:employeeId ──────────────────────────────────
+// Gemini-powered skill gap detection — LLM reasoning on top of peer task data.
+// ADMIN OR the employee themselves. 503 when GEMINI_API_KEY is unset.
+router.get('/gemini/skill-gap/:employeeId',
+    authMiddleware,
+    authorizeOwnerOrAdmin('employeeId'),
+    geminiSkillGapHandler,
+);
+
+// ── GET /api/ai/gemini/recommend/:taskId ──────────────────────────────────────
+// Gemini-powered single-best-employee recommendation for a task.
+// ADMIN only — exposes all active employee profiles + scores.
+// 503 when GEMINI_API_KEY is unset; use /recommend/:taskId as deterministic fallback.
+router.get('/gemini/recommend/:taskId',
+    authMiddleware,
+    authorize(['ADMIN']),
+    geminiRecommendHandler,
+);
+
+// ── GET /api/ai/gemini/trend/:employeeId ──────────────────────────────────────
+// Gemini-powered 30-day trend prediction with confidence % and explanation.
+// ADMIN OR the employee themselves. 503 when GEMINI_API_KEY is unset.
+// Deterministic fallback: GET /score/:employeeId exposes trendAnalysis.
+router.get('/gemini/trend/:employeeId',
+    authMiddleware,
+    authorizeOwnerOrAdmin('employeeId'),
+    geminiTrendHandler,
 );
 
 // ── POST /api/ai/analyze ──────────────────────────────────────────────────────

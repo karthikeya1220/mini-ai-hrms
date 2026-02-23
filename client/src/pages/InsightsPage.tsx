@@ -127,7 +127,7 @@ function InsightCard({ stat, onViewDetails }: InsightCardProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-200 truncate">{stat.name}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{stat.role ?? 'Employee'}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{stat.jobTitle ?? 'Employee'}</p>
                 </div>
                 <MiniScoreRing score={score} />
             </div>
@@ -174,7 +174,7 @@ interface AssignHelperProps {
 }
 
 function AssignHelper({ tasks, initialTaskId }: AssignHelperProps) {
-    const openTasks = tasks.filter(t => t.status !== 'completed');
+    const openTasks = tasks.filter(t => t.status !== 'COMPLETED');
     const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId ?? '');
     const [recs, setRecs]       = useState<Recommendation[] | null>(null);
     const [loading, setLoading] = useState(false);
@@ -290,7 +290,7 @@ function AssignHelper({ tasks, initialTaskId }: AssignHelperProps) {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-slate-200 truncate">{r.employee.name}</p>
                                         <p className="text-[10px] text-slate-500 truncate">
-                                            {r.employee.role ?? 'Employee'}
+                                            {r.employee.jobTitle ?? 'Employee'}
                                             {r.employee.department ? ` · ${r.employee.department}` : ''}
                                         </p>
                                     </div>

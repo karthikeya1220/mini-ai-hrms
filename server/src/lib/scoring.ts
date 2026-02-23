@@ -58,20 +58,44 @@ export function scoreToGrade(score: number): string {
 }
 
 /**
- * SPEC § 2.5 — Composite ranking score for employee recommendation.
+ * Composite ranking score for employee recommendation.
  *
- *   rank = (skillOverlap × 30) + ((10 − activeCount) × 20) + (perfScore × 0.5)
+ * New formula (weights sum to 100):
+ *   rank = (skillOverlapRate × 50) + (inverseActiveRate × 30) + (perfRate × 20)
  *
- * Notes:
- *   - activeCount can exceed 10 → (10 − activeCount) goes negative intentionally.
- *   - perfScore defaults to 50 when no history exists (SPEC: "?? 50").
+ * Factor definitions:
+ *   skillOverlapRate  = overlap / max(requiredCount, 1)          → 0–1
+ *                       Normalized against the task's required skill count so
+ *                       a 3/3 match always beats a 3/5 match regardless of totals.
+ *
+ *   inverseActiveRate = max(0, 10 − activeCount) / 10            → 0–1
+ *                       Capped at 10 open tasks; beyond that the employee
+ *                       is at full capacity and scores 0 on availability.
+ *                       Goes negative above 10 intentionally — the clamp prevents
+ *                       penalising other factors.
+ *
+ *   perfRate          = clamp(perfScore, 0, 100) / 100           → 0–1
+ *                       perfScore defaults to 50 when no history exists, yielding
+ *                       perfRate = 0.5 (neutral — neither rewarded nor penalised).
+ *
+ * Output range: 0–100 (all three sub-scores are in [0, 1] before weighting).
+ *
+ * @param overlap        Count of matched skills between employee and task.
+ * @param requiredCount  Total skills the task requires (denominator for overlap).
+ * @param activeCount    Current open (non-COMPLETED) task count for this employee.
+ * @param perfScore      Latest productivity score 0–100 (use 50 when absent).
  */
 export function computeRank(
-    skillOverlap: number,
+    overlap: number,
+    requiredCount: number,
     activeCount: number,
     perfScore: number,
 ): number {
-    return (skillOverlap * 30) + ((10 - activeCount) * 20) + (perfScore * 0.5);
+    const skillOverlapRate  = overlap / Math.max(requiredCount, 1);
+    const inverseActiveRate = Math.max(0, 10 - activeCount) / 10;
+    const perfRate          = Math.min(Math.max(perfScore, 0), 100) / 100;
+
+    return (skillOverlapRate * 50) + (inverseActiveRate * 30) + (perfRate * 20);
 }
 
 /**
@@ -101,7 +125,7 @@ export function computeScoreFromTasks(tasks: ReadonlyArray<ScoringTask>): Comput
     }
 
     // ── Factor 1: Completion Rate (weight 40) ──────────────────────────────────
-    const completed = tasks.filter(t => t.status === 'completed');
+    const completed = tasks.filter(t => t.status === 'COMPLETED');
     const totalCompleted = completed.length;
     const completionRate = totalCompleted / totalAssigned;
 
@@ -153,4 +177,67 @@ export function computeSkillOverlap(
 ): number {
     const required = new Set(requiredSkills.map(s => s.toLowerCase()));
     return employeeSkills.filter(s => required.has(s.toLowerCase())).length;
+}
+
+// ─── computeProductivityScore ─────────────────────────────────────────────────
+
+/** Return shape for computeProductivityScore. All rates are 0–1 fractions. */
+export interface ProductivityScore {
+    /** Weighted composite, 0–100 (1 decimal place). */
+    score: number;
+    /** completed / totalAssigned  (0–1). */
+    completionRate: number;
+    /** onTime / completedWithDueDate  (0–1; 0 when no deadline-tracked tasks). */
+    onTimeRate: number;
+    /** Mean complexityScore across ALL assigned tasks (1–5 scale). */
+    avgComplexity: number;
+}
+
+/**
+ * Pure productivity scorer.
+ *
+ * Weights (SPEC § 2.5):
+ *   40% — completion rate   (completed / assigned)
+ *   35% — on-time rate      (onTime / completedWithDueDate)
+ *   25% — avg complexity    (avgComplexity / 5, normalised 0–1)
+ *
+ * When `tasks` is empty, all rates are 0 and score is 0.
+ *
+ * No DB. No side-effects. Same input → same output.
+ */
+export function computeProductivityScore(
+    tasks: ReadonlyArray<ScoringTask>,
+): ProductivityScore {
+    const total = tasks.length;
+
+    if (total === 0) {
+        return { score: 0, completionRate: 0, onTimeRate: 0, avgComplexity: 0 };
+    }
+
+    // 40% — completion rate
+    const completed = tasks.filter(t => t.status === 'COMPLETED');
+    const completionRate = completed.length / total;
+
+    // 35% — on-time rate (only tasks with a dueDate are countable)
+    const withDue = completed.filter(t => t.dueDate !== null);
+    const onTime  = withDue.filter(
+        t => t.completedAt !== null && t.completedAt <= t.dueDate!,
+    );
+    const onTimeRate = withDue.length > 0 ? onTime.length / withDue.length : 0;
+
+    // 25% — average complexity (all assigned, normalised /5 for weighting)
+    const avgComplexity =
+        tasks.reduce((sum, t) => sum + t.complexityScore, 0) / total;
+    const complexityNorm = avgComplexity / 5;
+
+    // Weighted sum → 0–100, 1 decimal place
+    const raw   = completionRate * 40 + onTimeRate * 35 + complexityNorm * 25;
+    const score = Math.round(raw * 10) / 10;
+
+    return {
+        score,
+        completionRate: Math.round(completionRate * 1000) / 1000,
+        onTimeRate:     Math.round(onTimeRate     * 1000) / 1000,
+        avgComplexity:  Math.round(avgComplexity  * 100)  / 100,
+    };
 }

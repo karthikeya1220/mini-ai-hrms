@@ -38,9 +38,9 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
-    assigned:    'Assigned',
-    in_progress: 'In Progress',
-    completed:   'Completed',
+    ASSIGNED:    'Assigned',
+    IN_PROGRESS: 'In Progress',
+    COMPLETED:   'Completed',
 };
 
 function fmtDate(iso: string | null): string {
@@ -138,7 +138,7 @@ interface WorkSummaryProps {
 }
 
 function WorkSummary({ tasks }: WorkSummaryProps) {
-    const active   = tasks.filter(t => t.status !== 'completed');
+    const active   = tasks.filter(t => t.status !== 'COMPLETED');
     const overdue  = active.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
     const upcoming = active
         .filter(t => t.dueDate)
@@ -195,7 +195,7 @@ function TaskRow({ task, onClick }: TaskRowProps) {
             </span>
 
             {/* Blockchain verification badge — visible on completed tasks */}
-            {task.status === 'completed' && (
+            {task.status === 'COMPLETED' && (
                 task.txHash ? (
                     <a
                         href={`https://amoy.polygonscan.com/tx/${task.txHash}`}
@@ -266,7 +266,7 @@ export default function MyHome() {
             if (updated.id !== id) closeTask();
 
             // ── 3. On-chain log — only when marking completed ─────────────────
-            if (status === 'completed') {
+            if (status === 'COMPLETED') {
                 void (async () => {
                     if (!account) {
                         console.info('[web3] Wallet not connected — skipping on-chain log.');
@@ -337,8 +337,8 @@ export default function MyHome() {
     const sortedTasks = useMemo(() => {
         // Active first, then by due date ascending, completed at bottom
         return [...tasks].sort((a, b) => {
-            if (a.status === 'completed' && b.status !== 'completed') return 1;
-            if (a.status !== 'completed' && b.status === 'completed') return -1;
+            if (a.status === 'COMPLETED' && b.status !== 'COMPLETED') return 1;
+            if (a.status !== 'COMPLETED' && b.status === 'COMPLETED') return -1;
             if (!a.dueDate && !b.dueDate) return 0;
             if (!a.dueDate) return 1;
             if (!b.dueDate) return -1;

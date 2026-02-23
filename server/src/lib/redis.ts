@@ -115,3 +115,11 @@ export function cacheKey(namespace: string, discriminator: string): string {
 
 export const DASHBOARD_NS = 'dashboard';
 export const AI_SCORE_NS = 'ai:score';
+export const AI_SCORE_TTL = 300;  // seconds — 5 minutes
+
+// Gemini response cache — 10 minutes per result type
+export const GEMINI_SCORE_NS     = 'ai:gemini:score';
+export const GEMINI_SKILL_NS     = 'ai:gemini:skill';
+export const GEMINI_TREND_NS     = 'ai:gemini:trend';
+export const GEMINI_RECOMMEND_NS = 'ai:gemini:recommend';
+export const GEMINI_TTL          = 600;  // seconds — 10 minutes

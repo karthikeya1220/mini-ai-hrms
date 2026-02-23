@@ -105,7 +105,7 @@ export function EmployeeCard({ emp, onAssignTask, onViewDetails }: EmployeeCardP
                         {emp.name}
                     </p>
                     <p className="text-[11px] text-slate-500 leading-tight truncate mt-0.5">
-                        {emp.role ?? 'No role'}
+                        {emp.jobTitle ?? 'No role'}
                         {emp.department ? ` · ${emp.department}` : ''}
                     </p>
                 </div>

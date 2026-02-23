@@ -19,15 +19,28 @@
 // └─────────────────────────────────────────────────────────────────────────┘
 //
 // Design contract (AUTH_SYSTEM.md):
-//   Access token  — 15 m, signed with JWT_SECRET
-//                   payload: { userId, orgId, employeeId, email, role }
+//   Access token  — 15 m FIXED (not env-overridable — wider window = larger attack surface)
+//                   signed with JWT_SECRET
+//                   payload: { sub (userId), orgId, employeeId, role }
+//                   email is intentionally absent — it is PII that changes,
+//                   is not needed for authz decisions, and inflates every token.
+//                   Consumers that need email must look it up via /api/me.
 //   Refresh token — 7 d,  signed with JWT_REFRESH_SECRET
-//                   payload: { userId, orgId, tokenVersion }
+//                   payload: { sub (userId), orgId, role, employeeId, tokenVersion }
+//                   tokenVersion is the revocation vector — not a user claim.
 //
-// tokenVersion is an integer stored on the User row and incremented on
-// password-change or explicit logout.  Verification rejects any refresh
-// token whose embedded version is behind the stored version — this is the
-// server-side revocation mechanism that replaces a token blocklist.
+// Refresh token rotation (TOKEN ROTATION MODEL):
+//   Every successful refresh call:
+//     1. Verifies the refresh token (cryptographic + shape checks).
+//     2. Confirms user exists and is active.
+//     3. Rejects the token if tokenVersion in the JWT ≠ users.token_version in DB.
+//        - DB version > JWT version → TOKEN_REVOKED  (logout / password change)
+//        - DB version < JWT version → TOKEN_REUSE    (replay of consumed token)
+//     4. Atomically increments users.token_version via prisma.$transaction(update)
+//        and retrieves the committed new version from the DB — eliminates the
+//        read-then-compute race that would occur with a local +1 guess.
+//     5. Signs a new access token AND a new refresh token embedding the committed
+//        tokenVersion.  The old refresh token is now permanently stale.
 //
 // Secrets:
 //   JWT_SECRET          — required, access-token signing key
@@ -66,10 +79,9 @@ export type Role = 'ADMIN' | 'EMPLOYEE';// ─── Input shape ─────
 // Callers (controllers / auth middleware) fetch the full User row and pass it
 // here — the service never touches the database itself.
 export interface TokenUser {
-  id: string;                // users.id  (UUID)
+  id: string;                // users.id  (UUID) — becomes JWT sub
   orgId: string;             // users.org_id
   employeeId: string | null; // users.employee_id — null until Employee profile linked
-  email: string;             // users.email
   role: Role;                // Prisma Role enum: 'ADMIN' | 'EMPLOYEE'
   tokenVersion: number;      // users.token_version — incremented on revocation
 }
@@ -83,30 +95,38 @@ export interface TokenUser {
  * Custom claims follow the AUTH_SYSTEM.md contract exactly.
  */
 export interface AccessTokenPayload extends JwtPayload {
-  /** users.id */
+  /** users.id — also present as JWT standard claim `sub` */
   userId: string;
   /** users.org_id — tenant scoping for all downstream queries */
   orgId: string;
   /** users.employee_id — null for org-owner accounts not yet linked to an Employee row */
   employeeId: string | null;
-  /** Login email — convenience for logging / audit without a DB lookup */
-  email: string;
   /** 'ADMIN' | 'EMPLOYEE' — sourced from the Role enum column, not a VARCHAR */
   role: Role;
+  // email is intentionally absent: it is PII, changes over time, inflates every
+  // token, and is not needed for any authz decision.  Fetch it via GET /api/me.
 }
 
 /**
  * Claims embedded in a signed refresh token.
  *
- * Refresh tokens carry only the minimum claims needed to issue a new access
- * token.  tokenVersion is the revocation vector — if the stored version on the
- * User row is higher than this value, the token is considered revoked.
+ * Carries the minimum claims needed to:
+ *   - identify the user (sub / userId)
+ *   - scope the new access token (orgId, role, employeeId)
+ *   - enforce revocation (tokenVersion)
+ *
+ * tokenVersion is the revocation vector — if the stored version on the User
+ * row is higher than this value, the token is considered revoked.
  */
 export interface RefreshTokenPayload extends JwtPayload {
-  /** users.id */
+  /** users.id — also present as JWT standard claim `sub` */
   userId: string;
   /** users.org_id */
   orgId: string;
+  /** 'ADMIN' | 'EMPLOYEE' — carried so the new access token can be signed without a DB read */
+  role: Role;
+  /** users.employee_id — carried so the new access token can be signed without a DB read */
+  employeeId: string | null;
   /**
    * Snapshot of users.token_version at signing time.
    * verifyRefreshToken rejects the token if this is behind the current DB value.
@@ -187,19 +207,22 @@ function resolveKeyId(envVar: string, defaultKid: string): string {
 /**
  * Sign a short-lived access token for the given User.
  *
+ * TTL is fixed at 15 minutes — short enough to limit the exposure window of a
+ * leaked token without a blocklist.  Do not make this configurable: a larger
+ * value widens the attack window; a smaller value causes excessive refreshes.
+ *
  * @param user  Minimal User row slice — see TokenUser.
- * @returns     Signed JWT string, expires in 15 m (overridable via JWT_EXPIRES_IN).
+ * @returns     Signed JWT string, expires in exactly 15 m.
  */
 export function signAccessToken(user: TokenUser): string {
   const secret    = requireEnv('JWT_SECRET');
-  const expiresIn = (process.env.JWT_EXPIRES_IN ?? '15m') as SignOptions['expiresIn'];
+  const expiresIn = '15m' as SignOptions['expiresIn'];   // fixed — not env-overridable
   const kid       = resolveKeyId('JWT_KID', 'v1');
 
   const claims: Omit<AccessTokenPayload, keyof JwtPayload> = {
     userId:     user.id,
     orgId:      user.orgId,
     employeeId: user.employeeId,
-    email:      user.email,
     role:       user.role,
   };
 
@@ -237,7 +260,6 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
   if (
     typeof payload!.userId !== 'string' ||
     typeof payload!.orgId  !== 'string' ||
-    typeof payload!.email  !== 'string' ||
     typeof payload!.role   !== 'string' ||
     !['ADMIN', 'EMPLOYEE'].includes(payload!.role)
   ) {
@@ -267,6 +289,8 @@ export function signRefreshToken(user: TokenUser): string {
   const claims: Omit<RefreshTokenPayload, keyof JwtPayload> = {
     userId:       user.id,
     orgId:        user.orgId,
+    role:         user.role,
+    employeeId:   user.employeeId,
     tokenVersion: user.tokenVersion,
   };
 
@@ -313,6 +337,8 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
   if (
     typeof payload!.userId       !== 'string' ||
     typeof payload!.orgId        !== 'string' ||
+    typeof payload!.role         !== 'string' ||
+    !['ADMIN', 'EMPLOYEE'].includes(payload!.role) ||
     typeof payload!.tokenVersion !== 'number'
   ) {
     throw new AppError(401, 'INVALID_TOKEN', 'Refresh token payload is malformed.');
@@ -442,7 +468,6 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
       id:           user.id,
       orgId:        user.orgId,
       employeeId:   user.employeeId,
-      email:        user.email,
       role:         user.role as Role,
       tokenVersion: user.tokenVersion,
     };
@@ -562,7 +587,6 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
     id:           user.id,
     orgId:        user.orgId,
     employeeId:   user.employeeId,
-    email:        user.email,
     role:         user.role as Role,
     tokenVersion: user.tokenVersion,
   };
@@ -613,7 +637,12 @@ export interface RefreshResult {
  *   2. DB lookup by userId — confirms the user still exists.
  *   3. isActive check — deactivated accounts cannot refresh.
  *   4. tokenVersion comparison — rejects revoked or replayed tokens.
- *   5. Atomic tokenVersion increment — invalidates the consumed token.
+ *      TOKEN_REVOKED  — version mismatch caused by logout / password change.
+ *      TOKEN_REUSE    — version mismatch caused by replaying an already-rotated
+ *                       token; treated as a security event (possible theft).
+ *   5. Atomic tokenVersion increment inside a transaction — the DB returns
+ *      the updated row so the new refresh token embeds the exact committed
+ *      version, eliminating the read-then-write race condition.
  *   6. signAccessToken + signRefreshToken — issues fresh tokens embedding
  *      the new (incremented) version.
  *
@@ -623,7 +652,9 @@ export interface RefreshResult {
  * @throws AppError 401 TOKEN_EXPIRED          refresh token past its TTL.
  * @throws AppError 401 USER_NOT_FOUND         userId in token no longer exists.
  * @throws AppError 401 USER_INACTIVE          account has been deactivated.
- * @throws AppError 401 TOKEN_REVOKED          tokenVersion mismatch (reuse or logout).
+ * @throws AppError 401 TOKEN_REVOKED          tokenVersion mismatch (logout / password change).
+ * @throws AppError 401 TOKEN_REUSE            tokenVersion mismatch caused by replaying an
+ *                                             already-rotated token (possible token theft).
  */
 export async function refreshAccessToken(rawToken: string): Promise<RefreshResult> {
   // 1. Cryptographic verification — throws on invalid/expired/malformed token.
@@ -636,7 +667,6 @@ export async function refreshAccessToken(rawToken: string): Promise<RefreshResul
       id:           true,
       orgId:        true,
       employeeId:   true,
-      email:        true,
       role:         true,
       tokenVersion: true,
       isActive:     true,
@@ -653,33 +683,48 @@ export async function refreshAccessToken(rawToken: string): Promise<RefreshResul
     throw new AppError(401, 'USER_INACTIVE', 'This account has been deactivated.');
   }
 
-  // 5. tokenVersion comparison — the reuse / revocation check.
-  //    payload.tokenVersion is the version embedded when this refresh token was signed.
-  //    user.tokenVersion is the current ground truth from the DB.
-  //    A mismatch means this token has already been rotated, logged out, or
-  //    revoked by a password change — it must be rejected.
+  // 5. tokenVersion comparison — revocation and reuse detection.
+  //
+  //    payload.tokenVersion — the version embedded when this token was signed.
+  //    user.tokenVersion    — the current ground truth from the DB.
+  //
+  //    Case A: version is ahead of payload  →  explicit revocation (logout /
+  //            password change / deactivation incremented the DB version).
+  //            Error: TOKEN_REVOKED.
+  //
+  //    Case B: version is behind payload    →  impossible under normal operation
+  //            (DB version only ever increments).  Treat as token reuse / forgery.
+  //            Error: TOKEN_REUSE.
+  //
+  //    Both cases use strict equality — any mismatch is rejected.
   if (user.tokenVersion !== payload.tokenVersion) {
-    throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked. Please log in again.');
+    const code = user.tokenVersion > payload.tokenVersion ? 'TOKEN_REVOKED' : 'TOKEN_REUSE';
+    const msg  = code === 'TOKEN_REVOKED'
+      ? 'Session has been revoked. Please log in again.'
+      : 'Refresh token has already been used. Please log in again.';
+    throw new AppError(401, code, msg);
   }
 
-  // 6. Atomically increment tokenVersion — consumes the current refresh token.
-  //    The old token now embeds a stale version; any replay attempt fails step 5.
-  //    updateMany avoids a throw if the row is deleted mid-flight (count === 0
-  //    is an acceptable silent outcome — the account is already gone).
-  const newVersion = user.tokenVersion + 1;
-  await prisma.user.updateMany({
-    where: { id: user.id },
-    data:  { tokenVersion: { increment: 1 } },
+  // 6. Atomic increment inside a transaction — the UPDATE returns the updated row
+  //    so we hold the exact committed tokenVersion for signing.  This eliminates
+  //    the read-then-compute race: a concurrent rotation on the same account
+  //    will see tokenVersion !== payload.tokenVersion at step 5 above and be
+  //    rejected with TOKEN_REUSE before reaching this point.
+  const updated = await prisma.$transaction(async (tx) => {
+    return tx.user.update({
+      where: { id: user.id },
+      data:  { tokenVersion: { increment: 1 } },
+      select: { tokenVersion: true },
+    });
   });
 
-  // 7. Issue both tokens embedding the NEW version.
+  // 7. Issue both tokens embedding the exact committed version.
   const tokenUser: TokenUser = {
     id:           user.id,
     orgId:        user.orgId,
     employeeId:   user.employeeId,
-    email:        user.email,
     role:         user.role as Role,
-    tokenVersion: newVersion,
+    tokenVersion: updated.tokenVersion,   // ← exact DB value, not a local guess
   };
 
   return {

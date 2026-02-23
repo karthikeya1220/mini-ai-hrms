@@ -9,7 +9,7 @@ export const COLUMN_META: Record<
     TaskStatus,
     { label: string; accent: string; badge: string; icon: ReactNode }
 > = {
-    assigned: {
+    ASSIGNED: {
         label: 'Assigned',
         accent: 'border-slate-500',
         badge: 'bg-slate-800 text-slate-400',
@@ -20,7 +20,7 @@ export const COLUMN_META: Record<
             </svg>
         ),
     },
-    in_progress: {
+    IN_PROGRESS: {
         label: 'In Progress',
         accent: 'border-indigo-500',
         badge: 'bg-indigo-500/15 text-indigo-400',
@@ -32,7 +32,7 @@ export const COLUMN_META: Record<
             </svg>
         ),
     },
-    completed: {
+    COMPLETED: {
         label: 'Completed',
         accent: 'border-emerald-500',
         badge: 'bg-emerald-500/15 text-emerald-400',

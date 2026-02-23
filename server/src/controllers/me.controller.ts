@@ -5,6 +5,14 @@
 // the JWT.  The employee profile (name) is looked up only when the user has
 // a linked employeeId — ADMIN users created at registration have no Employee
 // profile and get an empty name gracefully.
+//
+// Org-scope enforcement:
+//   The employee lookup uses findFirst({ where: { id, orgId } }) rather than
+//   findUnique({ where: { id } }).  Although users.employee_id is unique (so
+//   a plain findUnique would not cross tenants in practice), the compound
+//   where clause is a defence-in-depth guard: if the JWT were somehow forged
+//   with a foreign employeeId, the orgId check prevents the read from
+//   returning data from another tenant.
 // =============================================================================
 
 import { Response } from 'express';
@@ -15,29 +23,35 @@ import prisma from '../lib/prisma';
 export async function getMe(req: AuthRequest, res: Response): Promise<void> {
     const user = req.user!;
 
-    // Fire both queries in parallel — org fetch and employee fetch are independent.
+    // Fire all three queries in parallel — all are independent.
+    // email is no longer embedded in the JWT (PII minimization); we fetch it
+    // from the DB here, the one place that actually needs it for the client.
     // The employee query resolves to null immediately when employeeId is absent,
     // so Promise.all never blocks on a no-op branch.
-    const [org, employee] = await Promise.all([
-        (prisma.organization as any).findUnique({
+    const [org, employee, dbUser] = await Promise.all([
+        prisma.organization.findFirst({
             where:  { id: user.orgId },
             select: { id: true, name: true },
         }),
         user.employeeId
-            ? (prisma.employee as any).findUnique({
-                  where:  { id: user.employeeId },
+            ? prisma.employee.findFirst({
+                  where:  { id: user.employeeId, orgId: user.orgId }, // org-scoped — cross-tenant guard
                   select: { name: true },
               })
             : Promise.resolve(null),
+        prisma.user.findFirst({
+            where:  { id: user.id, orgId: user.orgId },
+            select: { email: true },
+        }),
     ]);
 
     sendSuccess(res, {
         user: {
             id:         user.id,
-            email:      user.email,
+            email:      dbUser?.email ?? '',
             role:       user.role,
             employeeId: user.employeeId,
-            name:       (employee as { name: string } | null)?.name ?? '',
+            name:       employee?.name ?? '',
         },
         org: org ?? { id: user.orgId, name: 'Workspace' },
     });

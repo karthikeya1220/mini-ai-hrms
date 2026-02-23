@@ -21,7 +21,7 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 
 // ─── Model config ─────────────────────────────────────────────────────────────
 
-const MODEL_NAME   = 'gemini-1.5-flash'; // fast, cheap, 1M context
+const MODEL_NAME   = 'gemini-2.5-flash'; // fast, cheap, 1M context
 const TIMEOUT_MS   = 15_000;
 const RETRY_AFTER  = 3_000; // ms to wait before one retry on 429
 

@@ -54,6 +54,24 @@ export function createApp(): Express {
         }
     }
 
+    // ── Required env-var guard ────────────────────────────────────────────────
+    // Fail fast at startup rather than surfacing cryptic 503s at runtime.
+    // Add every key that is non-negotiable for the server to function correctly.
+    const REQUIRED_ENV: ReadonlyArray<string> = [
+        'DATABASE_URL',
+        'JWT_SECRET',
+        'JWT_REFRESH_SECRET',
+        'GEMINI_API_KEY',
+    ];
+
+    const missing = REQUIRED_ENV.filter(k => !process.env[k]?.trim());
+    if (missing.length > 0) {
+        throw new Error(
+            `[startup] Missing required environment variable(s): ${missing.join(', ')}. ` +
+            'Copy server/.env.example → server/.env and fill in all required values.',
+        );
+    }
+
     app.use(
         cors({
             origin: (origin, callback) => {

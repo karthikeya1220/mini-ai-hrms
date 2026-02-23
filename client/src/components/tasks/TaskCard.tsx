@@ -51,12 +51,12 @@ function MiniAvatar({ name }: { name?: string }) {
 // ─── Minimal status dropdown (keyboard / touch fallback) ──────────────────────
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-    assigned:    'Assigned',
-    in_progress: 'In Progress',
-    completed:   'Completed',
+    ASSIGNED:    'Assigned',
+    IN_PROGRESS: 'In Progress',
+    COMPLETED:   'Completed',
 };
 
-const ALL_STATUSES: TaskStatus[] = ['assigned', 'in_progress', 'completed'];
+const ALL_STATUSES: TaskStatus[] = ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED'];
 
 interface StatusDropdownProps {
     current: TaskStatus;
@@ -74,7 +74,7 @@ function StatusDropdown({ current, taskId, onMove, disabled }: StatusDropdownPro
     return (
         <select
             value={current}
-            disabled={disabled || current === 'completed'}
+            disabled={disabled || current === 'COMPLETED'}
             onChange={e => onMove(taskId, e.target.value as TaskStatus)}
             onClick={e => e.stopPropagation()}
             className="
@@ -117,7 +117,7 @@ export function TaskCard({
         <div
             ref={cardRef}
             id={`task-card-${task.id}`}
-            draggable={task.status !== 'completed'}
+            draggable={task.status !== 'COMPLETED'}
             onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(task.id); }}
             onDragEnd={onDragEnd}
             onClick={() => onOpen(task.id)}
@@ -134,7 +134,7 @@ export function TaskCard({
                     ? 'opacity-50 border-indigo-500/50 scale-95'
                     : 'border-slate-800 hover:border-slate-700'
                 }
-                ${task.status === 'completed' ? 'opacity-60' : ''}
+                ${task.status === 'COMPLETED' ? 'opacity-60' : ''}
             `}
         >
             {/* ── Row 1: priority dot + title ── */}
@@ -145,7 +145,7 @@ export function TaskCard({
                     aria-label={`Priority: ${p.label}`}
                 />
                 <p className={`text-sm font-medium leading-snug flex-1 min-w-0 ${
-                    task.status === 'completed' ? 'line-through text-slate-500' : 'text-slate-100'
+                    task.status === 'COMPLETED' ? 'line-through text-slate-500' : 'text-slate-100'
                 }`}>
                     {task.title}
                 </p>
@@ -159,7 +159,7 @@ export function TaskCard({
                 {/* Right: verification badge · due date · dropdown */}
                 <div className="flex items-center gap-2 ml-auto">
                     {/* Blockchain verification — show on completed tasks */}
-                    {task.status === 'completed' && (
+                    {task.status === 'COMPLETED' && (
                         task.txHash ? (
                             <a
                                 href={`https://amoy.polygonscan.com/tx/${task.txHash}`}

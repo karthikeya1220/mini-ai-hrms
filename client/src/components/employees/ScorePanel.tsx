@@ -169,7 +169,7 @@ export function ScorePanel({ employee, onClose }: Props) {
                 <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
                     <div>
                         <p className="text-sm font-semibold text-white">{employee.name}</p>
-                        <p className="text-xs text-slate-500">{employee.role ?? 'No role'}</p>
+                        <p className="text-xs text-slate-500">{employee.jobTitle ?? 'No job title'}</p>
                     </div>
                     <button
                         onClick={onClose}

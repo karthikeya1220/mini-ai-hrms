@@ -178,7 +178,7 @@ export default function EmployeesPage() {
             return (
                 e.name.toLowerCase().includes(q) ||
                 e.email.toLowerCase().includes(q) ||
-                (e.role?.toLowerCase().includes(q)) ||
+                (e.jobTitle?.toLowerCase().includes(q)) ||
                 (e.department?.toLowerCase().includes(q)) ||
                 e.skills.some(s => s.toLowerCase().includes(q))
             );
@@ -351,12 +351,10 @@ export default function EmployeesPage() {
                                                     </a>
                                                 </td>
 
-                                                {/* Role */}
-                                                <td className="px-4 py-3.5 text-slate-300 whitespace-nowrap">
-                                                    {emp.role ?? <span className="text-slate-700">—</span>}
-                                                </td>
-
-                                                {/* Department */}
+                                {/* Job title */}
+                                <td className="px-4 py-3.5 text-slate-300 whitespace-nowrap">
+                                    {emp.jobTitle ?? <span className="text-slate-700">—</span>}
+                                </td>                                                {/* Department */}
                                                 <td className="px-4 py-3.5">
                                                     {emp.department ? (
                                                         <span className="inline-flex text-xs px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">

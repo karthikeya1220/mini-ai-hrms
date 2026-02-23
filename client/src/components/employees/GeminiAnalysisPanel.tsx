@@ -1,52 +1,344 @@
 // components/employees/GeminiAnalysisPanel.tsx
 //
-// Renders a tabbed Gemini-powered analysis panel for one employee.
-// Three tabs: Score · Skill Gaps · Workload
+// Tabbed Gemini AI panel embedded in ScorePanel.
+// Three tabs — each lazy-loads on first click, results cached for component lifetime.
 //
-// Each tab lazy-loads its Gemini analysis on first click (never pre-fetches all
-// three — Gemini calls are expensive). Results are cached client-side for the
-// lifetime of this component mount via local state.
+// Tab 1 · Score     → GET /api/ai/gemini/score/:employeeId
+//   Displays: numeric score ring, grade, explanation, strengths/concerns, confidence
+//
+// Tab 2 · Skill Gaps → GET /api/ai/gemini/skill-gap/:employeeId
+//   Displays: missing skills (chips), emerging skills (chips), rationale, confidence
+//
+// Tab 3 · Trend      → GET /api/ai/gemini/trend/:employeeId
+//   Displays: directional arrow, confidence bar, explanation, key signals, forecast
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-    analyzeScore,
-    analyzeSkillGap,
-    analyzeWorkload,
-    type WorkforceScoreAnalysis,
-    type SkillGapAnalysis,
-    type WorkloadPrediction,
+    geminiScore,
+    geminiSkillGap,
+    geminiTrend,
+    type GeminiScoreResult,
+    type GeminiSkillGapResult,
+    type GeminiTrendResult,
 } from '../../api/ai';
 
-// ─── Tab types ────────────────────────────────────────────────────────────────
+// ─── Tab registry ─────────────────────────────────────────────────────────────
 
-type Tab = 'score' | 'skill-gap' | 'workload';
+type Tab = 'score' | 'skill-gap' | 'trend';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: 'score',     label: 'Score Analysis',  icon: '📊' },
-    { id: 'skill-gap', label: 'Skill Gaps',       icon: '🎯' },
-    { id: 'workload',  label: 'Workload Risk',    icon: '⚡' },
+    { id: 'score',     label: 'Score',      icon: '📊' },
+    { id: 'skill-gap', label: 'Skill Gaps', icon: '🎯' },
+    { id: 'trend',     label: 'Trend',      icon: '📈' },
 ];
 
-// ─── Risk colour map ──────────────────────────────────────────────────────────
+// ─── Colour maps ──────────────────────────────────────────────────────────────
 
-const RISK_COLOR: Record<WorkloadPrediction['riskLevel'], string> = {
-    low:      'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    medium:   'text-amber-400   bg-amber-500/10   border-amber-500/20',
-    high:     'text-orange-400  bg-orange-500/10  border-orange-500/20',
-    critical: 'text-red-400     bg-red-500/10     border-red-500/20',
-};
-
-const URGENCY_COLOR: Record<'critical' | 'high' | 'medium', string> = {
-    critical: 'text-red-400     bg-red-500/10     border-red-500/20',
-    high:     'text-orange-400  bg-orange-500/10  border-orange-500/20',
-    medium:   'text-amber-400   bg-amber-500/10   border-amber-500/20',
-};
-
-const CONFIDENCE_COLOR: Record<WorkforceScoreAnalysis['confidence'], string> = {
+const CONFIDENCE_TEXT: Record<'high' | 'medium' | 'low', string> = {
     high:   'text-emerald-400',
     medium: 'text-amber-400',
-    low:    'text-slate-400',
+    low:    'text-slate-500',
 };
+
+const TREND_META: Record<'up' | 'down' | 'flat', { arrow: string; label: string; cls: string }> = {
+    up:   { arrow: '↑', label: 'Improving',  cls: 'text-emerald-400' },
+    down: { arrow: '↓', label: 'Declining',  cls: 'text-red-400'     },
+    flat: { arrow: '→', label: 'Stable',     cls: 'text-slate-400'   },
+};
+
+// ─── Shared loading / error states ───────────────────────────────────────────
+
+function LoadingState() {
+    return (
+        <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-slate-500">Gemini is analysing…</p>
+        </div>
+    );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+            <span className="text-2xl">⚠️</span>
+            <p className="text-xs text-slate-400 max-w-[240px]">{message}</p>
+            <button
+                onClick={onRetry}
+                className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 mt-1"
+            >
+                Retry
+            </button>
+        </div>
+    );
+}
+
+// ─── Score Tab ────────────────────────────────────────────────────────────────
+
+function ScoreTab({
+    data, loading, error, onRetry,
+}: {
+    data: GeminiScoreResult | null;
+    loading: boolean;
+    error: string | null;
+    onRetry: () => void;
+}) {
+    if (loading) return <LoadingState />;
+    if (error)   return <ErrorState message={error} onRetry={onRetry} />;
+    if (!data)   return null;
+
+    const score   = data.score ?? 0;
+    const r       = 44;
+    const circ    = 2 * Math.PI * r;
+    const fill    = (score / 100) * circ;
+    const color   =
+        score >= 90 ? '#10b981' :
+        score >= 80 ? '#8b5cf6' :
+        score >= 70 ? '#38bdf8' :
+        score >= 60 ? '#f59e0b' : '#ef4444';
+
+    return (
+        <div className="space-y-4">
+            {/* Score ring + grade */}
+            {data.score !== null ? (
+                <div className="flex items-center gap-4">
+                    <svg width="108" height="108" viewBox="0 0 108 108" className="shrink-0">
+                        <circle cx="54" cy="54" r={r} fill="none" stroke="#1e293b" strokeWidth="8" />
+                        <circle
+                            cx="54" cy="54" r={r}
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="8"
+                            strokeLinecap="round"
+                            strokeDasharray={`${fill} ${circ}`}
+                            strokeDashoffset={circ * 0.25}
+                            style={{ transition: 'stroke-dasharray 0.9s cubic-bezier(0.4,0,0.2,1)' }}
+                        />
+                        <text x="54" y="50" textAnchor="middle" fill="white" fontSize="22" fontWeight="800" fontFamily="Inter,sans-serif">
+                            {score}
+                        </text>
+                        <text x="54" y="66" textAnchor="middle" fill={color} fontSize="12" fontWeight="700" fontFamily="Inter,sans-serif">
+                            {data.grade ?? '—'}
+                        </text>
+                    </svg>
+                    <div className="space-y-1.5 min-w-0">
+                        <p className="text-xs text-slate-300 leading-relaxed">{data.explanation}</p>
+                        <p className={`text-[10px] font-semibold uppercase tracking-widest ${CONFIDENCE_TEXT[data.confidence]}`}>
+                            Confidence: {data.confidence}
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <p className="text-xs text-slate-500 text-center py-4">
+                    No completed tasks yet — score will appear once a task is completed.
+                </p>
+            )}
+
+            {/* Strengths */}
+            {data.strengths.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Strengths</p>
+                    <ul className="space-y-1.5">
+                        {data.strengths.map((s, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+                                {s}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Concerns */}
+            {data.concerns.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Concerns</p>
+                    <ul className="space-y-1.5">
+                        {data.concerns.map((c, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                                <span className="text-amber-400 mt-0.5 shrink-0">!</span>
+                                {c}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Skill Gap Tab ────────────────────────────────────────────────────────────
+
+function SkillGapTab({
+    data, loading, error, onRetry,
+}: {
+    data: GeminiSkillGapResult | null;
+    loading: boolean;
+    error: string | null;
+    onRetry: () => void;
+}) {
+    if (loading) return <LoadingState />;
+    if (error)   return <ErrorState message={error} onRetry={onRetry} />;
+    if (!data)   return null;
+
+    return (
+        <div className="space-y-4">
+            {/* Rationale */}
+            <p className="text-xs text-slate-300 leading-relaxed">{data.rationale}</p>
+
+            {/* Confidence */}
+            <p className={`text-[10px] font-semibold uppercase tracking-widest ${CONFIDENCE_TEXT[data.confidence]}`}>
+                Confidence: {data.confidence}
+                {data.peerTaskSkills.length > 0 && (
+                    <span className="text-slate-600 font-normal normal-case ml-1">
+                        ({data.peerTaskSkills.length} peer skills sampled)
+                    </span>
+                )}
+            </p>
+
+            {/* Missing skills */}
+            {data.missingSkills.length > 0 ? (
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                        Missing Skills
+                        <span className="ml-1 text-red-400 font-bold">({data.missingSkills.length})</span>
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {data.missingSkills.map(skill => (
+                            <span
+                                key={skill}
+                                className="px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/25 text-[11px] font-medium text-red-300"
+                            >
+                                {skill}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    No skill gaps detected — fully aligned with peer role requirements.
+                </div>
+            )}
+
+            {/* Emerging skills */}
+            {data.emergingSkills.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                        Emerging Skills to Consider
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {data.emergingSkills.map(skill => (
+                            <span
+                                key={skill}
+                                className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/25 text-[11px] font-medium text-indigo-300"
+                            >
+                                {skill}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Current skills (collapsed list) */}
+            {data.currentSkills.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 mb-1.5">
+                        Current Skills ({data.currentSkills.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                        {data.currentSkills.map(skill => (
+                            <span
+                                key={skill}
+                                className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 text-[10px] text-slate-400"
+                            >
+                                {skill}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Trend Tab ────────────────────────────────────────────────────────────────
+
+function TrendTab({
+    data, loading, error, onRetry,
+}: {
+    data: GeminiTrendResult | null;
+    loading: boolean;
+    error: string | null;
+    onRetry: () => void;
+}) {
+    if (loading) return <LoadingState />;
+    if (error)   return <ErrorState message={error} onRetry={onRetry} />;
+    if (!data)   return null;
+
+    const meta = TREND_META[data.trend];
+
+    return (
+        <div className="space-y-4">
+            {/* Trend arrow + direction */}
+            <div className="flex items-center gap-3">
+                <span className={`text-4xl font-black leading-none ${meta.cls}`}>{meta.arrow}</span>
+                <div>
+                    <p className={`text-base font-bold ${meta.cls}`}>{meta.label}</p>
+                    <p className="text-[10px] text-slate-500">
+                        {data.logCount} log{data.logCount !== 1 ? 's' : ''} over {data.windowDays}-day window
+                    </p>
+                </div>
+                {/* Confidence badge */}
+                <div className="ml-auto text-right">
+                    <p className="text-[10px] text-slate-500 mb-0.5">Confidence</p>
+                    <p className={`text-sm font-bold tabular-nums ${
+                        data.confidence >= 75 ? 'text-emerald-400' :
+                        data.confidence >= 40 ? 'text-amber-400'   : 'text-slate-500'
+                    }`}>{data.confidence}%</p>
+                </div>
+            </div>
+
+            {/* Confidence bar */}
+            <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                        data.confidence >= 75 ? 'bg-emerald-500' :
+                        data.confidence >= 40 ? 'bg-amber-500'   : 'bg-slate-600'
+                    }`}
+                    style={{ width: `${data.confidence}%` }}
+                />
+            </div>
+
+            {/* Explanation */}
+            <p className="text-xs text-slate-300 leading-relaxed">{data.explanation}</p>
+
+            {/* Key signals */}
+            {data.keySignals.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Key Signals</p>
+                    <ul className="space-y-1.5">
+                        {data.keySignals.map((signal, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                                <span className={`mt-0.5 shrink-0 font-bold ${meta.cls}`}>•</span>
+                                {signal}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Forecast */}
+            {data.forecast && (
+                <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">7-Day Forecast</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{data.forecast}</p>
+                </div>
+            )}
+        </div>
+    );
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -55,23 +347,25 @@ interface Props {
     employeeName: string;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Main Panel ───────────────────────────────────────────────────────────────
 
 export function GeminiAnalysisPanel({ employeeId, employeeName }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('score');
 
-    // Per-tab state
-    const [scoreData,   setScoreData]   = useState<WorkforceScoreAnalysis | null>(null);
-    const [gapData,     setGapData]     = useState<SkillGapAnalysis | null>(null);
-    const [workData,    setWorkData]    = useState<WorkloadPrediction | null>(null);
+    // Per-tab data
+    const [scoreData,  setScoreData]  = useState<GeminiScoreResult   | null>(null);
+    const [gapData,    setGapData]    = useState<GeminiSkillGapResult | null>(null);
+    const [trendData,  setTrendData]  = useState<GeminiTrendResult    | null>(null);
 
+    // Per-tab loading
     const [scoreLoading,  setScoreLoading]  = useState(false);
     const [gapLoading,    setGapLoading]    = useState(false);
-    const [workLoading,   setWorkLoading]   = useState(false);
+    const [trendLoading,  setTrendLoading]  = useState(false);
 
+    // Per-tab errors
     const [scoreError,  setScoreError]  = useState<string | null>(null);
     const [gapError,    setGapError]    = useState<string | null>(null);
-    const [workError,   setWorkError]   = useState<string | null>(null);
+    const [trendError,  setTrendError]  = useState<string | null>(null);
 
     // ── Lazy loaders ──────────────────────────────────────────────────────────
 
@@ -80,42 +374,60 @@ export function GeminiAnalysisPanel({ employeeId, employeeName }: Props) {
         setScoreLoading(true);
         setScoreError(null);
         try {
-            const res = await analyzeScore(employeeId);
-            setScoreData(res.analysis);
+            setScoreData(await geminiScore(employeeId));
         } catch {
-            setScoreError('Could not load score analysis. Please try again.');
+            setScoreError('Gemini score unavailable. The server may be busy — please retry.');
         } finally {
             setScoreLoading(false);
         }
     }, [employeeId, scoreData, scoreLoading]);
+
+    const retryScore = useCallback(() => {
+        setScoreData(null);
+        setScoreError(null);
+        setScoreLoading(false);
+    }, []);
 
     const loadGap = useCallback(async () => {
         if (gapData || gapLoading) return;
         setGapLoading(true);
         setGapError(null);
         try {
-            const res = await analyzeSkillGap(employeeId);
-            setGapData(res.analysis);
+            setGapData(await geminiSkillGap(employeeId));
         } catch {
-            setGapError('Could not load skill gap analysis. Please try again.');
+            setGapError('Skill gap analysis unavailable. Please retry.');
         } finally {
             setGapLoading(false);
         }
     }, [employeeId, gapData, gapLoading]);
 
-    const loadWork = useCallback(async () => {
-        if (workData || workLoading) return;
-        setWorkLoading(true);
-        setWorkError(null);
+    const retryGap = useCallback(() => {
+        setGapData(null);
+        setGapError(null);
+        setGapLoading(false);
+    }, []);
+
+    const loadTrend = useCallback(async () => {
+        if (trendData || trendLoading) return;
+        setTrendLoading(true);
+        setTrendError(null);
         try {
-            const res = await analyzeWorkload(employeeId);
-            setWorkData(res.analysis);
+            setTrendData(await geminiTrend(employeeId));
         } catch {
-            setWorkError('Could not load workload prediction. Please try again.');
+            setTrendError('Trend analysis unavailable. Please retry.');
         } finally {
-            setWorkLoading(false);
+            setTrendLoading(false);
         }
-    }, [employeeId, workData, workLoading]);
+    }, [employeeId, trendData, trendLoading]);
+
+    const retryTrend = useCallback(() => {
+        setTrendData(null);
+        setTrendError(null);
+        setTrendLoading(false);
+    }, []);
+
+    // Auto-load score on first mount
+    useEffect(() => { loadScore(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Tab switch ────────────────────────────────────────────────────────────
 
@@ -123,28 +435,21 @@ export function GeminiAnalysisPanel({ employeeId, employeeName }: Props) {
         setActiveTab(tab);
         if (tab === 'score')     loadScore();
         if (tab === 'skill-gap') loadGap();
-        if (tab === 'workload')  loadWork();
+        if (tab === 'trend')     loadTrend();
     };
-
-    // Trigger first tab on mount
-    const [mounted, setMounted] = useState(false);
-    if (!mounted) {
-        setMounted(true);
-        loadScore();
-    }
 
     // ── Render ────────────────────────────────────────────────────────────────
 
     return (
         <div className="rounded-xl border border-slate-700/60 bg-slate-900 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/60 bg-slate-800/40">
-                <span className="text-lg">✨</span>
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/60 bg-slate-800/50">
+                <span className="text-base">✨</span>
                 <div>
                     <p className="text-xs font-semibold text-white leading-none">Gemini AI Analysis</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">{employeeName}</p>
                 </div>
-                <span className="ml-auto text-[10px] text-slate-600 font-mono">gemini-1.5-flash</span>
+                <span className="ml-auto text-[10px] text-slate-600 font-mono">gemini-2.5-flash</span>
             </div>
 
             {/* Tabs */}
@@ -166,234 +471,32 @@ export function GeminiAnalysisPanel({ employeeId, employeeName }: Props) {
             </div>
 
             {/* Tab content */}
-            <div className="p-4 min-h-[200px]">
-                {activeTab === 'score'     && <ScoreTab     data={scoreData}  loading={scoreLoading}  error={scoreError} />}
-                {activeTab === 'skill-gap' && <SkillGapTab  data={gapData}    loading={gapLoading}    error={gapError} />}
-                {activeTab === 'workload'  && <WorkloadTab  data={workData}   loading={workLoading}   error={workError} />}
-            </div>
-        </div>
-    );
-}
-
-// =============================================================================
-// Sub-tab renderers
-// =============================================================================
-
-function LoadingState() {
-    return (
-        <div className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-slate-500">Gemini is analysing…</p>
-        </div>
-    );
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-    return (
-        <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-            <span className="text-2xl">⚠️</span>
-            <p className="text-xs text-slate-400">{message}</p>
-            {onRetry && (
-                <button onClick={onRetry} className="text-xs text-indigo-400 hover:text-indigo-300 mt-1">
-                    Retry
-                </button>
-            )}
-        </div>
-    );
-}
-
-// ── Score Tab ─────────────────────────────────────────────────────────────────
-
-function ScoreTab({ data, loading, error }: {
-    data: WorkforceScoreAnalysis | null;
-    loading: boolean;
-    error: string | null;
-}) {
-    if (loading) return <LoadingState />;
-    if (error)   return <ErrorState message={error} />;
-    if (!data)   return null;
-
-    return (
-        <div className="space-y-4">
-            {/* Summary */}
-            <p className="text-sm text-slate-300 leading-relaxed">{data.summary}</p>
-
-            {/* Confidence */}
-            <p className={`text-[10px] font-semibold uppercase tracking-widest ${CONFIDENCE_COLOR[data.confidence]}`}>
-                Confidence: {data.confidence}
-            </p>
-
-            {/* Strengths */}
-            {data.strengths.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Strengths</p>
-                    <ul className="space-y-1.5">
-                        {data.strengths.map((s, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="text-emerald-400 mt-0.5">✓</span>
-                                {s}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Concerns */}
-            {data.concerns.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Concerns</p>
-                    <ul className="space-y-1.5">
-                        {data.concerns.map((c, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="text-amber-400 mt-0.5">!</span>
-                                {c}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Recommendations */}
-            {data.recommendations.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Recommendations</p>
-                    <ul className="space-y-1.5">
-                        {data.recommendations.map((r, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="text-indigo-400 mt-0.5 font-bold">{i + 1}.</span>
-                                {r}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ── Skill Gap Tab ─────────────────────────────────────────────────────────────
-
-function SkillGapTab({ data, loading, error }: {
-    data: SkillGapAnalysis | null;
-    loading: boolean;
-    error: string | null;
-}) {
-    if (loading) return <LoadingState />;
-    if (error)   return <ErrorState message={error} />;
-    if (!data)   return null;
-
-    return (
-        <div className="space-y-4">
-            <p className="text-sm text-slate-300 leading-relaxed">{data.summary}</p>
-
-            {data.priorityGaps.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Priority Gaps</p>
-                    <ul className="space-y-2">
-                        {data.priorityGaps.map((gap, i) => (
-                            <li key={i} className="rounded-lg border border-slate-700/60 p-3 bg-slate-800/40">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-semibold text-white capitalize">{gap.skill}</span>
-                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${URGENCY_COLOR[gap.urgency]}`}>
-                                        {gap.urgency}
-                                    </span>
-                                </div>
-                                <p className="text-[11px] text-slate-400">{gap.learningPath}</p>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {data.quickWins.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Quick Wins</p>
-                    <ul className="flex flex-wrap gap-2">
-                        {data.quickWins.map((w, i) => (
-                            <li key={i} className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">
-                                {w}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs text-slate-500">Timeline:</span>
-                <span className="text-xs text-slate-300 font-medium">{data.timelineEstimate}</span>
-            </div>
-        </div>
-    );
-}
-
-// ── Workload Tab ──────────────────────────────────────────────────────────────
-
-function WorkloadTab({ data, loading, error }: {
-    data: WorkloadPrediction | null;
-    loading: boolean;
-    error: string | null;
-}) {
-    if (loading) return <LoadingState />;
-    if (error)   return <ErrorState message={error} />;
-    if (!data)   return null;
-
-    return (
-        <div className="space-y-4">
-            {/* Risk badge */}
-            <div className="flex items-center gap-2">
-                <span className={`text-xs font-bold px-2.5 py-1 rounded border uppercase tracking-wide ${RISK_COLOR[data.riskLevel]}`}>
-                    {data.riskLevel} risk
-                </span>
-                <span className="text-xs text-slate-400">{data.riskSummary}</span>
-            </div>
-
-            {/* Capacity bar */}
-            <div>
-                <div className="flex justify-between mb-1">
-                    <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">Remaining Capacity</span>
-                    <span className="text-[10px] text-slate-400">{data.capacityScore}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                            data.capacityScore >= 60 ? 'bg-emerald-500'
-                            : data.capacityScore >= 35 ? 'bg-amber-500'
-                            : 'bg-red-500'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(0, data.capacityScore))}%` }}
+            <div className="p-4 min-h-[220px]">
+                {activeTab === 'score'     && (
+                    <ScoreTab
+                        data={scoreData}
+                        loading={scoreLoading}
+                        error={scoreError}
+                        onRetry={retryScore}
                     />
-                </div>
+                )}
+                {activeTab === 'skill-gap' && (
+                    <SkillGapTab
+                        data={gapData}
+                        loading={gapLoading}
+                        error={gapError}
+                        onRetry={retryGap}
+                    />
+                )}
+                {activeTab === 'trend'     && (
+                    <TrendTab
+                        data={trendData}
+                        loading={trendLoading}
+                        error={trendError}
+                        onRetry={retryTrend}
+                    />
+                )}
             </div>
-
-            {/* Predicted issues */}
-            {data.predictedIssues.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">If Unaddressed</p>
-                    <ul className="space-y-1.5">
-                        {data.predictedIssues.map((issue, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="text-red-400 mt-0.5">→</span>
-                                {issue}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Actions */}
-            {data.rebalanceActions.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Recommended Actions</p>
-                    <ul className="space-y-1.5">
-                        {data.rebalanceActions.map((action, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="text-indigo-400 mt-0.5 font-bold">{i + 1}.</span>
-                                {action}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
         </div>
     );
 }

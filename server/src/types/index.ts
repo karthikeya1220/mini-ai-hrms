@@ -15,8 +15,10 @@ export interface AuthenticatedUser {
     id: string;                  // users.id (User UUID — NOT Employee UUID)
     orgId: string;               // users.org_id — sole source of tenant scoping
     employeeId: string | null;   // users.employee_id — null until Employee profile linked
-    email: string;
     role: UserRole;
+    // email is intentionally absent from the JWT payload and therefore from this
+    // type.  It is PII, changes over time, and is not needed for authz decisions.
+    // Controllers that need it must fetch via GET /api/me (which queries the DB).
 }
 
 export interface AuthRequest extends Request {
@@ -40,8 +42,11 @@ export interface ApiError {
 export type ApiResponse<T = unknown> = ApiSuccess<T> | ApiError;
 
 // ─── Task Status ─────────────────────────────────────────────────────────────
-// SPEC § 2.3: status enum values
-export type TaskStatus = 'assigned' | 'in_progress' | 'completed';
+// Mirrors the Prisma TaskStatus enum (migration: 20260223000004_task_status_enum).
+// Values are SCREAMING_SNAKE_CASE to match the Postgres enum type exactly.
+// FSM (forward-only — enforced in task.service.ts via VALID_TRANSITIONS):
+//   ASSIGNED → IN_PROGRESS → COMPLETED
+export type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED';
 
 // ─── Task Priority ───────────────────────────────────────────────────────────
 export type TaskPriority = 'low' | 'medium' | 'high';
@@ -97,10 +102,10 @@ export interface TaskResponse extends Omit<TaskRow, 'orgId'> {
 }
 
 // ─── Status FSM ───────────────────────────────────────────────────────────────
-// SPEC § 2.3: assigned → in_progress → completed (forward-only)
+// SPEC § 2.3: ASSIGNED → IN_PROGRESS → COMPLETED (forward-only)
 // Defined in types so both task service and future AI scoring share the guard.
 export const VALID_TRANSITIONS: Readonly<Record<TaskStatus, TaskStatus[]>> = {
-    assigned: ['in_progress'],
-    in_progress: ['completed'],
-    completed: [],             // terminal — no further transitions allowed
+    ASSIGNED:    ['IN_PROGRESS'],
+    IN_PROGRESS: ['COMPLETED'],
+    COMPLETED:   [],             // terminal — no further transitions allowed
 };

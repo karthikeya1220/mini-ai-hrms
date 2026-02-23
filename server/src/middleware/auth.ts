@@ -66,11 +66,11 @@ export async function authMiddleware(
 
         // 3. Populate req.user exclusively from the verified JWT payload.
         //    Every field is cryptographically bound — the client cannot forge any of them.
+        //    email is not in the token (removed as PII); fetch via GET /api/me if needed.
         req.user = {
             id:         payload.userId,
             orgId:      payload.orgId,
             employeeId: payload.employeeId,
-            email:      payload.email,
             role:       payload.role as UserRole,
         };
 

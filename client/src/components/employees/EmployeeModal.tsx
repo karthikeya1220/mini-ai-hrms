@@ -78,7 +78,7 @@ export function EmployeeModal({ mode, initial, onSave, onClose }: Props) {
 
     const [name, setName] = useState(initial?.name ?? '');
     const [email, setEmail] = useState(initial?.email ?? '');
-    const [role, setRole] = useState(initial?.role ?? '');
+    const [jobTitle, setJobTitle] = useState(initial?.jobTitle ?? '');
     const [dept, setDept] = useState(initial?.department ?? '');
     const [skills, setSkills] = useState<string[]>(initial?.skills ?? []);
     const [wallet, setWallet] = useState(initial?.walletAddress ?? '');
@@ -119,7 +119,7 @@ export function EmployeeModal({ mode, initial, onSave, onClose }: Props) {
             const payload: EmployeeInput = {
                 name: name.trim(),
                 email: email.trim().toLowerCase(),
-                ...(role.trim() && { role: role.trim() }),
+                ...(jobTitle.trim() && { jobTitle: jobTitle.trim() }),
                 ...(dept.trim() && { department: dept.trim() }),
                 ...(skills.length && { skills }),
                 ...(wallet.trim() && { walletAddress: wallet.trim() }),
@@ -205,16 +205,16 @@ export function EmployeeModal({ mode, initial, onSave, onClose }: Props) {
                         {errors.email && <p className="field-error">{errors.email}</p>}
                     </div>
 
-                    {/* Role / Department side-by-side */}
+                    {/* Job title / Department side-by-side */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label htmlFor={`${uid}-role`} className="field-label">Role</label>
+                            <label htmlFor={`${uid}-role`} className="field-label">Job title</label>
                             <input
                                 id={`${uid}-role`}
                                 className="input"
                                 placeholder="Frontend Engineer"
-                                value={role}
-                                onChange={e => setRole(e.target.value)}
+                                value={jobTitle}
+                                onChange={e => setJobTitle(e.target.value)}
                                 disabled={saving}
                             />
                         </div>

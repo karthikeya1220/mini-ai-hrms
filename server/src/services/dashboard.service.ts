@@ -5,7 +5,7 @@
 //   GET /api/dashboard — org-level summary + per-employee completion stats.
 //
 // Design decisions:
-//   1. Four queries run in a single Promise.all() batch — one round-trip
+//   1. Five queries run in a single Promise.all() batch — one round-trip
 //      to the DB connection pool instead of sequential awaits.
 //   2. Per-employee completion stats use task.groupBy({ by: ['assignedTo', 'status'],
 //      _count: { id: true } }). The DB aggregates before transmitting: at most
@@ -13,8 +13,8 @@
 //      Org-level tasksAssigned/tasksCompleted are derived from the same buckets —
 //      no separate task.count() calls needed.
 //   3. orgId scoping is applied on EVERY where clause — never omitted.
-//   4. Unassigned tasks (assignedTo = null) contribute to org-level totals but
-//      are excluded from per-employee stats (null bucket key is skipped).
+//   4. Unassigned tasks (assignedTo = null) are excluded from both org-level totals
+//      and per-employee stats — the null bucket is skipped in every loop.
 //
 // Redis caching (§ Caching Layer):
 //   - TTL: 60 seconds, per-org key (hrms:dashboard:<orgId>)
@@ -54,6 +54,25 @@ export interface RecentBlockchainLog {
     loggedAt: Date;
 }
 
+/** A single entry in the recent performance_logs feed. */
+export interface RecentPerformanceLog {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    score: number | null;
+    completionRate: number | null;
+    onTimeRate: number | null;
+    avgComplexity: number | null;
+    createdAt: Date;
+}
+
+/** Identifies a single employee as the org's top or lowest performer. */
+export interface PerformerSummary {
+    employeeId: string;
+    name: string;
+    score: number;
+}
+
 /** Top-level shape returned by getDashboardStats(). */
 export interface DashboardStats {
     totalEmployees: number;
@@ -61,6 +80,16 @@ export interface DashboardStats {
     tasksAssigned: number;
     tasksCompleted: number;
     completionRate: number;
+
+    // ── AI performance aggregates ─────────────────────────────────────────────
+    /** Mean of latest productivity scores across all scored employees. null if none scored yet. */
+    avgOrgScore: number | null;
+    /** Employee with the highest latest productivity score. null if none scored yet. */
+    topPerformer: PerformerSummary | null;
+    /** Employee with the lowest latest productivity score. null if none scored yet. */
+    lowestPerformer: PerformerSummary | null;
+    /** Most recent performance_log rows across the org (newest first, max 10). */
+    recentPerformanceLogs: RecentPerformanceLog[];
 
     // Per-employee breakdown
     employeeStats: EmployeeCompletionStat[];
@@ -123,6 +152,11 @@ export async function getDashboardStats(orgId: string): Promise<DashboardStats> 
                 if (data.recentLogs) {
                     data.recentLogs = data.recentLogs.map(l => ({ ...l, loggedAt: new Date(l.loggedAt) }));
                 }
+                if (data.recentPerformanceLogs) {
+                    data.recentPerformanceLogs = data.recentPerformanceLogs.map(l => ({
+                        ...l, createdAt: new Date(l.createdAt),
+                    }));
+                }
                 data._meta = { source: 'cache', cachedAt: data.generatedAt.toISOString() };
                 return data;
             }
@@ -176,6 +210,7 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
         employeeRows,
         taskBuckets,
         blockchainLogs,
+        rawPerfLogs,
     ] = await Promise.all([
 
         // 1. Total employees
@@ -191,10 +226,14 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
             orderBy: { name: 'asc' },
         }),
 
-        // 4. Per-(employee, status) task counts
+        // 4. Per-(employee, status) task counts — DB does the aggregation.
+        //    assignedTo filter: { not: null } excludes unassigned tasks at the
+        //    query level so no null-bucket rows cross the wire at all.
+        //    Result shape: Array<{ assignedTo: string; status: TaskStatus; _count: { id: number } }>
+        //    At most 3 rows per employee (ASSIGNED / IN_PROGRESS / COMPLETED).
         prisma.task.groupBy({
             by: ['assignedTo', 'status'],
-            where: { orgId },
+            where: { orgId, assignedTo: { not: null } },
             _count: { id: true },
         }),
 
@@ -215,24 +254,42 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
             },
             orderBy: { loggedAt: 'desc' },
         }),
+
+        // 6. Recent performance_logs — newest 10 across the org, with employee name.
+        //    score filter: { not: null } skips "no tasks yet" null rows — only
+        //    meaningful scored entries appear in the feed.
+        prisma.performanceLog.findMany({
+            where: { orgId, score: { not: null } },
+            select: {
+                id: true,
+                employeeId: true,
+                score: true,
+                completionRate: true,
+                onTimeRate: true,
+                avgComplexity: true,
+                createdAt: true,
+                employee: { select: { name: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+        }),
     ]);
 
-    // ── Derive org-level totals ────────────────────────────────────────────────
+    // ── Derive org-level totals from groupBy buckets ──────────────────────────
     let tasksAssigned = 0;
     let tasksCompleted = 0;
     for (const bucket of taskBuckets) {
         tasksAssigned += bucket._count.id;
-        if (bucket.status === 'completed') tasksCompleted += bucket._count.id;
+        if (bucket.status === 'COMPLETED') tasksCompleted += bucket._count.id;
     }
 
-    // ── Build per-employee task lookup ─────────────────────────────────────────
+    // ── Build per-employee task lookup from the same buckets ───────────────────
     const empCountMap = new Map<string, { assigned: number; completed: number }>();
     for (const bucket of taskBuckets) {
-        const empId = bucket.assignedTo;
-        if (!empId) continue;
+        const empId = bucket.assignedTo as string;
         const entry = empCountMap.get(empId) ?? { assigned: 0, completed: 0 };
         entry.assigned += bucket._count.id;
-        if (bucket.status === 'completed') entry.completed += bucket._count.id;
+        if (bucket.status === 'COMPLETED') entry.completed += bucket._count.id;
         empCountMap.set(empId, entry);
     }
 
@@ -245,35 +302,82 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
         }
     }
 
-    // ── Fetch scores ───────────────────────────────────────────────────────────
+    // ── Fetch latest score per employee ────────────────────────────────────────
     const employeeIds = employeeRows.map(e => e.id);
     const scoreMap = await getLatestScoreMap(orgId, employeeIds);
 
-    // ── Assemble stats ─────────────────────────────────────────────────────────
+    // ── AI performance aggregates ─────────────────────────────────────────────
+    // Work from scoreMap — only employees who have been scored are included.
+    // This avoids the "50 default" from recommendation logic polluting averages.
+    const scoredEntries = [...scoreMap.entries()]; // [employeeId, score]
+
+    let avgOrgScore: number | null = null;
+    let topPerformer: PerformerSummary | null = null;
+    let lowestPerformer: PerformerSummary | null = null;
+
+    if (scoredEntries.length > 0) {
+        // Build a quick name lookup from the employee rows we already have
+        const nameById = new Map(employeeRows.map(e => [e.id, e.name]));
+
+        // avgOrgScore — mean of all latest scores, 1 d.p.
+        const scoreSum = scoredEntries.reduce((s, [, v]) => s + v, 0);
+        avgOrgScore = Math.round((scoreSum / scoredEntries.length) * 10) / 10;
+
+        // Sort descending by score to find top and lowest in one pass
+        const sorted = [...scoredEntries].sort((a, b) => b[1] - a[1]);
+
+        const [topId, topScore] = sorted[0]!;
+        topPerformer = {
+            employeeId: topId,
+            name: nameById.get(topId) ?? topId,
+            score: Math.round(topScore * 10) / 10,
+        };
+
+        const [lowId, lowScore] = sorted[sorted.length - 1]!;
+        lowestPerformer = {
+            employeeId: lowId,
+            name: nameById.get(lowId) ?? lowId,
+            score: Math.round(lowScore * 10) / 10,
+        };
+    }
+
+    // ── Recent performance_logs feed ──────────────────────────────────────────
+    const recentPerformanceLogs: RecentPerformanceLog[] = rawPerfLogs.map(l => ({
+        id:             l.id,
+        employeeId:     l.employeeId,
+        employeeName:   l.employee.name,
+        score:          l.score,
+        completionRate: l.completionRate,
+        onTimeRate:     l.onTimeRate,
+        avgComplexity:  l.avgComplexity,
+        createdAt:      l.createdAt,
+    }));
+
+    // ── Assemble employee stats ────────────────────────────────────────────────
     const employeeStats: EmployeeCompletionStat[] = employeeRows.map(emp => {
         const counts = empCountMap.get(emp.id) ?? { assigned: 0, completed: 0 };
         const rate = counts.assigned > 0 ? (counts.completed / counts.assigned) : 0;
 
         return {
-            employeeId: emp.id,
-            name: emp.name,
-            jobTitle: emp.jobTitle,
-            department: emp.department,
-            isActive: emp.isActive,
-            tasksAssigned: counts.assigned,
-            tasksCompleted: counts.completed,
-            completionRate: Math.round(rate * 1000) / 1000,
+            employeeId:        emp.id,
+            name:              emp.name,
+            jobTitle:          emp.jobTitle,
+            department:        emp.department,
+            isActive:          emp.isActive,
+            tasksAssigned:     counts.assigned,
+            tasksCompleted:    counts.completed,
+            completionRate:    Math.round(rate * 1000) / 1000,
             productivityScore: scoreMap.get(emp.id) ?? null,
-            verifiedTasks: verifiedCountMap.get(emp.id) ?? 0,
+            verifiedTasks:     verifiedCountMap.get(emp.id) ?? 0,
         };
     }).sort((a, b) => b.completionRate - a.completionRate || a.name.localeCompare(b.name));
 
     const recentLogs: RecentBlockchainLog[] = blockchainLogs.slice(0, 10).map(log => ({
-        taskId: log.task.id,
-        taskTitle: log.task.title,
+        taskId:       log.task.id,
+        taskTitle:    log.task.title,
         employeeName: log.task.employee?.name ?? 'Unknown',
-        txHash: log.txHash,
-        loggedAt: log.loggedAt,
+        txHash:       log.txHash,
+        loggedAt:     log.loggedAt,
     }));
 
     return {
@@ -281,7 +385,13 @@ async function queryDashboardFromDB(orgId: string): Promise<DashboardStats> {
         activeEmployees,
         tasksAssigned,
         tasksCompleted,
-        completionRate: tasksAssigned > 0 ? Math.round((tasksCompleted / tasksAssigned) * 1000) / 1000 : 0,
+        completionRate: tasksAssigned > 0
+            ? Math.round((tasksCompleted / tasksAssigned) * 1000) / 1000
+            : 0,
+        avgOrgScore,
+        topPerformer,
+        lowestPerformer,
+        recentPerformanceLogs,
         employeeStats,
         recentLogs,
         generatedAt: new Date(),

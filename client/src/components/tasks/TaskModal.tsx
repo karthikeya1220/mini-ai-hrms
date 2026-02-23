@@ -240,7 +240,7 @@ export function TaskModal({ onSave, onClose, employees }: Props) {
                         >
                             <option value="">— Unassigned —</option>
                             {employees.filter(e => e.isActive).map(e => (
-                                <option key={e.id} value={e.id}>{e.name} {e.role ? `(${e.role})` : ''}</option>
+                                <option key={e.id} value={e.id}>{e.name} {e.jobTitle ? `(${e.jobTitle})` : ''}</option>
                             ))}
                         </select>
                     </div>

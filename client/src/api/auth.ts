@@ -37,13 +37,16 @@ export interface AuthResponse {
 }
 
 // ─── POST /auth/register ──────────────────────────────────────────────────────
+// role is intentionally absent — self-registration ALWAYS produces ADMIN.
+// Employee accounts are created exclusively by an authenticated ADMIN via
+// POST /api/employees.  Sending role from the client has no effect server-side
+// (the field is stripped by RegisterSchema) but we omit it here too so the
+// client cannot even construct a payload with it.
 
 export interface RegisterInput {
     orgName: string;
     email: string;
     password: string;
-    /** Role for the registering user. Defaults to 'ADMIN' on the server if omitted. */
-    role?: 'ADMIN' | 'EMPLOYEE';
 }
 
 export async function apiRegister(input: RegisterInput): Promise<AuthResponse> {

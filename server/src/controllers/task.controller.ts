@@ -33,7 +33,7 @@ import {
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
 const PriorityEnum = z.enum(['low', 'medium', 'high']);
-const StatusEnum = z.enum(['assigned', 'in_progress', 'completed']);
+const StatusEnum = z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED']);
 
 const CreateTaskSchema = z.object({
     title: z.string().min(1, 'Title is required').max(255),

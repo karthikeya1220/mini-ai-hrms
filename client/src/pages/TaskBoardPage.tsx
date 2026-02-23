@@ -75,7 +75,7 @@ function SkeletonCard() {
 
 // ─── Board ────────────────────────────────────────────────────────────────────
 
-const COLUMNS: TaskStatus[] = ['assigned', 'in_progress', 'completed'];
+const COLUMNS: TaskStatus[] = ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED'];
 
 export default function TaskBoardPage() {
     const { isAdmin } = useAuth();

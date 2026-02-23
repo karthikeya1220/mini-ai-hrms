@@ -28,9 +28,9 @@ const PRIORITY_META: Record<string, { dot: string; label: string }> = {
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-    assigned:    'Assigned',
-    in_progress: 'In Progress',
-    completed:   'Completed',
+    ASSIGNED:    'Assigned',
+    IN_PROGRESS: 'In Progress',
+    COMPLETED:   'Completed',
 };
 
 const COMPLEXITY_LABELS: Record<number, string> = {
@@ -290,7 +290,7 @@ export function TaskDetailDrawer({
                                 <MiniAvatar name={assignee.name} />
                                 <div>
                                     <p className="text-xs font-semibold text-slate-200">{assignee.name}</p>
-                                    <p className="text-[10px] text-slate-500">{assignee.role ?? 'Employee'}{assignee.department ? ` · ${assignee.department}` : ''}</p>
+                                    <p className="text-[10px] text-slate-500">{assignee.jobTitle ?? 'Employee'}{assignee.department ? ` · ${assignee.department}` : ''}</p>
                                 </div>
                             </div>
                         ) : (
@@ -339,7 +339,7 @@ export function TaskDetailDrawer({
                     </div>
 
                     {/* AI Recommendation — Admin only: navigate to Insights */}
-                    {isAdmin && task.status !== 'completed' && (
+                    {isAdmin && task.status !== 'COMPLETED' && (
                         <div>
                             <SectionLabel>AI Recommendation</SectionLabel>
                             <button

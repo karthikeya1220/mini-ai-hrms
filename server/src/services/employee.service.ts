@@ -395,13 +395,25 @@ export async function updateEmployee(
  *
  * TOCTOU fix (MEDIUM-4 from arch audit):
  *   Single atomic updateMany — same pattern as updateEmployee() above.
+ *
+ * Session revocation:
+ *   In addition to setting isActive = false on the User row, tokenVersion is
+ *   atomically incremented.  Any refresh token the deactivated employee holds
+ *   embeds the old tokenVersion — verifyRefreshToken() will reject it on the
+ *   next refresh attempt even if the client somehow bypasses the isActive check.
+ *   This dual-guard (isActive + tokenVersion) means there is no revocation
+ *   window between deactivation and natural token expiry.
  */
 export async function deactivateEmployee(
     orgId: string,
     employeeId: string,
 ): Promise<EmployeeRow> {
-    // Atomically disable the Employee row AND its linked User account so that
-    // in-flight sessions are rejected by authMiddleware's isActive check.
+    // Atomically disable the Employee row AND its linked User account so that:
+    //   - isActive = false  → authMiddleware rejects the account immediately.
+    //   - tokenVersion++    → invalidates every outstanding refresh token,
+    //                         closing the window until the access token expires.
+    // Both updates are scoped to orgId — cross-tenant mutation is structurally
+    // impossible even if a caller supplies a foreign employeeId.
     const [result] = await prisma.$transaction([
         prisma.employee.updateMany({
             where: { id: employeeId, orgId },   // ownership guard — org-scoped
@@ -409,7 +421,10 @@ export async function deactivateEmployee(
         }),
         prisma.user.updateMany({
             where: { employeeId, orgId },       // same ownership guard on User side
-            data:  { isActive: false },
+            data:  {
+                isActive:     false,
+                tokenVersion: { increment: 1 }, // revoke all outstanding refresh tokens
+            },
         }),
     ]);
 

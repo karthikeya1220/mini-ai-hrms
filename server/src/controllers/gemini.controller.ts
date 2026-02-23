@@ -113,7 +113,7 @@ export async function analyzeHandler(
         if (body.type === 'score') {
             // Compute breakdown locally (same formula as scoring engine)
             const tasks = employee.tasks;
-            const completed = tasks.filter(t => t.status === 'completed');
+            const completed = tasks.filter(t => t.status === 'COMPLETED');
             const totalAssigned = tasks.length;
             const totalCompleted = completed.length;
             const completionRate = totalAssigned > 0 ? totalCompleted / totalAssigned : 0;
@@ -183,7 +183,7 @@ export async function analyzeHandler(
 
         } else {
             // workload
-            const activeTasks = employee.tasks.filter(t => t.status !== 'completed');
+            const activeTasks = employee.tasks.filter(t => t.status !== 'COMPLETED');
             const priorities  = { low: 0, medium: 0, high: 0 };
             for (const t of activeTasks) {
                 const p = t.priority as 'low' | 'medium' | 'high';
@@ -196,14 +196,14 @@ export async function analyzeHandler(
             const trend = await computeTrendForEmployee(orgId, body.employeeId);
             const perfLog = await prisma.performanceLog.findFirst({
                 where: { orgId, employeeId: body.employeeId, score: { not: null } },
-                orderBy: { computedAt: 'desc' },
+                orderBy: { createdAt: 'desc' },
                 select: { score: true },
             });
 
             // Weekly completions: count completed tasks per week for last 4 weeks
             const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
             const recentCompleted = employee.tasks.filter(
-                t => t.status === 'completed' && t.completedAt && t.completedAt >= fourWeeksAgo,
+                t => t.status === 'COMPLETED' && t.completedAt && t.completedAt >= fourWeeksAgo,
             );
             const weeklyCompletions = [0, 1, 2, 3].map(weekIdx => {
                 const start = new Date(Date.now() - (weekIdx + 1) * 7 * 24 * 60 * 60 * 1000);
@@ -250,14 +250,14 @@ async function computeTrendForEmployee(
             orgId,
             employeeId,
             score:      { not: null },
-            computedAt: { gte: d60 },
+            createdAt: { gte: d60 },
         },
-        select: { score: true, computedAt: true },
-        orderBy: { computedAt: 'asc' },
+        select: { score: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
     });
 
-    const recent   = logs.filter(l => l.computedAt >= d30);
-    const previous = logs.filter(l => l.computedAt < d30);
+    const recent   = logs.filter(l => l.createdAt >= d30);
+    const previous = logs.filter(l => l.createdAt < d30);
 
     if (!recent.length || !previous.length) return 'insufficient_data';
 

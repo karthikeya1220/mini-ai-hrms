@@ -104,49 +104,58 @@ describe('scoreToGrade', () => {
 });
 
 // =============================================================================
-// computeRank — SPEC formula: (skillOverlap × 30) + ((10 − activeCount) × 20) + (perfScore × 0.5)
+// computeRank — formula: (overlapRate×50) + (inverseActiveRate×30) + (perfRate×20)
+//   overlapRate  = overlap / max(required, 1)
+//   inverseRate  = max(0, 10 − active) / 10
+//   perfRate     = clamp(perf, 0, 100) / 100
+//   output range: [0, 100]
 // =============================================================================
 describe('computeRank', () => {
     it('computes rank correctly with all factors positive', () => {
-        // skillOverlap=3, activeCount=2, perfScore=80
-        // = (3*30) + ((10-2)*20) + (80*0.5)
-        // = 90 + 160 + 40 = 290
-        expect(computeRank(3, 2, 80)).toBe(290);
+        // overlap=3, required=5, active=2, perf=80
+        // overlapRate = 3/5 = 0.6  → 0.6*50 = 30
+        // inverseRate = (10-2)/10 = 0.8 → 0.8*30 = 24
+        // perfRate    = 80/100 = 0.8  → 0.8*20 = 16
+        // rank = 30 + 24 + 16 = 70
+        expect(computeRank(3, 5, 2, 80)).toBe(70);
     });
 
     it('handles zero skill overlap', () => {
-        // (0*30) + ((10-2)*20) + (80*0.5) = 0 + 160 + 40 = 200
-        expect(computeRank(0, 2, 80)).toBe(200);
+        // overlap=0, required=5, active=2, perf=80
+        // 0 + 24 + 16 = 40
+        expect(computeRank(0, 5, 2, 80)).toBe(40);
     });
 
-    it('penalises high activeCount — (10 − activeCount) goes negative', () => {
-        // skillOverlap=5, activeCount=15, perfScore=50
-        // = (5*30) + ((10-15)*20) + (50*0.5)
-        // = 150 + (-100) + 25 = 75
-        expect(computeRank(5, 15, 50)).toBe(75);
+    it('clamps inverseActiveRate to 0 when activeCount >= 10', () => {
+        // overlap=5, required=5, active=15, perf=50
+        // overlapRate = 1.0 → 50
+        // inverseRate = max(0, 10-15)/10 = 0 → 0
+        // perfRate    = 0.5 → 10
+        // rank = 50 + 0 + 10 = 60
+        expect(computeRank(5, 5, 15, 50)).toBe(60);
     });
 
-    it('uses default perfScore of 50 (SPEC: "?? 50") as baseline', () => {
-        // At perfScore=50, the score contribution is 50 * 0.5 = 25
-        // skillOverlap=0, activeCount=10 → (0*30) + (0*20) + 25 = 25
-        expect(computeRank(0, 10, 50)).toBe(25);
+    it('uses default perfScore of 50 (neutral baseline) correctly', () => {
+        // overlap=0, required=5, active=10, perf=50
+        // 0 + 0 + (0.5*20) = 10
+        expect(computeRank(0, 5, 10, 50)).toBe(10);
     });
 
     it('higher skill overlap always improves rank — all else equal', () => {
-        const low = computeRank(1, 3, 70);
-        const high = computeRank(5, 3, 70);
+        const low  = computeRank(1, 5, 3, 70);
+        const high = computeRank(5, 5, 3, 70);
         expect(high).toBeGreaterThan(low);
     });
 
     it('lower activeCount always improves rank — all else equal', () => {
-        const busy = computeRank(3, 8, 70);
-        const free = computeRank(3, 1, 70);
+        const busy = computeRank(3, 5, 8, 70);
+        const free = computeRank(3, 5, 1, 70);
         expect(free).toBeGreaterThan(busy);
     });
 
     it('higher perfScore always improves rank — all else equal', () => {
-        const low = computeRank(3, 3, 40);
-        const high = computeRank(3, 3, 90);
+        const low  = computeRank(3, 5, 3, 40);
+        const high = computeRank(3, 5, 3, 90);
         expect(high).toBeGreaterThan(low);
     });
 });
@@ -487,54 +496,56 @@ describe('computeScoreFromTasks — combined formula verification', () => {
 // ─── recommendation ranking logic ─────────────────────────────────────────────
 describe('computeRank — recommendation ranking logic', () => {
     it('employee with full skill match ranks higher than partial match', () => {
-        // Both employees: activeCount=2, perfScore=70
-        // Full:     skillOverlap=5 → rank = (5*30)+((10-2)*20)+(70*0.5) = 150+160+35 = 345
-        // Partial:  skillOverlap=2 → rank = (2*30)+160+35 = 255
-        const fullMatch = computeRank(5, 2, 70);
-        const partialMatch = computeRank(2, 2, 70);
+        // required=5, active=2, perf=70 for both
+        // Full:    overlap=5 → rate=1.0 → 1.0*50=50; (8/10)*30=24; (70/100)*20=14 → 88
+        // Partial: overlap=2 → rate=0.4 → 0.4*50=20; 24; 14 → 58
+        const fullMatch    = computeRank(5, 5, 2, 70);
+        const partialMatch = computeRank(2, 5, 2, 70);
         expect(fullMatch).toBeGreaterThan(partialMatch);
-        expect(fullMatch).toBe(345);
-        expect(partialMatch).toBe(255);
+        expect(fullMatch).toBe(88);
+        expect(partialMatch).toBe(58);
     });
 
-    it('employee with fewer active tasks ranks higher — SPEC availability factor', () => {
-        // Both: skillOverlap=3, perfScore=70
-        // Free:   activeCount=1 → (3*30)+((10-1)*20)+(70*0.5) = 90+180+35 = 305
-        // Busy:   activeCount=8 → (3*30)+((10-8)*20)+35 = 90+40+35 = 165
-        const free = computeRank(3, 1, 70);
-        const busy = computeRank(3, 8, 70);
+    it('employee with fewer active tasks ranks higher — availability factor', () => {
+        // overlap=3, required=5, perf=70 for both
+        // Free: active=1  → inverseRate=(9/10)=0.9 → 0.9*30=27; overlapRate=0.6→30; perfRate=0.7→14 → 71
+        // Busy: active=8  → inverseRate=(2/10)=0.2 → 0.2*30=6;  30; 14 → 50
+        const free = computeRank(3, 5, 1, 70);
+        const busy = computeRank(3, 5, 8, 70);
         expect(free).toBeGreaterThan(busy);
-        expect(free).toBe(305);
-        expect(busy).toBe(165);
+        expect(free).toBe(71);
+        expect(busy).toBe(50);
     });
 
-    it('employee with higher perfScore ranks higher — SPEC reliability factor', () => {
-        // Both: skillOverlap=3, activeCount=3
-        // High: perfScore=90  → (3*30)+((10-3)*20)+(90*0.5) = 90+140+45 = 275
-        // Low:  perfScore=40  → 90+140+20 = 250
-        const high = computeRank(3, 3, 90);
-        const low = computeRank(3, 3, 40);
+    it('employee with higher perfScore ranks higher — reliability factor', () => {
+        // overlap=3, required=5, active=3 for both
+        // High: perf=90 → (0.6*50)+(0.7*30)+(0.9*20) = 30+21+18 = 69
+        // Low:  perf=40 → 30+21+(0.4*20) = 30+21+8 = 59
+        const high = computeRank(3, 5, 3, 90);
+        const low  = computeRank(3, 5, 3, 40);
         expect(high).toBeGreaterThan(low);
-        expect(high).toBe(275);
-        expect(low).toBe(250);
+        expect(high).toBe(69);
+        expect(low).toBe(59);
     });
 
-    it('default perfScore 50 (SPEC: ?? 50) matches no-history employees baseline', () => {
-        // skillOverlap=0, activeCount=10, perfScore=50
-        // = (0*30)+((10-10)*20)+(50*0.5) = 0 + 0 + 25 = 25
-        expect(computeRank(0, 10, 50)).toBe(25);
+    it('default perfScore 50 (neutral) at zero overlap and full load scores perf factor only', () => {
+        // overlap=0, required=5, active=10, perf=50
+        // 0 + 0 + (0.5*20) = 10
+        expect(computeRank(0, 5, 10, 50)).toBe(10);
     });
 
     it('correctly orders 3 candidates to match expected top-3 recommendation', () => {
-        // This simulates the sort that recommendEmployees applies.
+        // Alice:   overlap=2/5, active=5, perf=70 → (0.4*50)+(0.5*30)+(0.7*20) = 20+15+14 = 49
+        // Bob:     overlap=5/5, active=1, perf=90 → (1.0*50)+(0.9*30)+(0.9*20) = 50+27+18 = 95
+        // Charlie: overlap=4/5, active=3, perf=60 → (0.8*50)+(0.7*30)+(0.6*20) = 40+21+12 = 73
         const candidates = [
-            { name: 'Alice', rank: computeRank(2, 5, 70) },  // 60+100+35 = 195
-            { name: 'Bob', rank: computeRank(5, 1, 90) },  // 150+180+45 = 375
-            { name: 'Charlie', rank: computeRank(4, 3, 60) },  // 120+140+30 = 290
+            { name: 'Alice',   rank: computeRank(2, 5, 5, 70) },
+            { name: 'Bob',     rank: computeRank(5, 5, 1, 90) },
+            { name: 'Charlie', rank: computeRank(4, 5, 3, 60) },
         ];
         const sorted = [...candidates].sort((a, b) => b.rank - a.rank);
-        expect(sorted[0]!.name).toBe('Bob');     // rank 375
-        expect(sorted[1]!.name).toBe('Charlie'); // rank 290
-        expect(sorted[2]!.name).toBe('Alice');   // rank 195
+        expect(sorted[0]!.name).toBe('Bob');      // rank 95
+        expect(sorted[1]!.name).toBe('Charlie');  // rank 73
+        expect(sorted[2]!.name).toBe('Alice');    // rank 49
     });
 });

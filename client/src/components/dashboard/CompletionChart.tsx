@@ -39,7 +39,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
     return (
         <div className="rounded-xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm p-3 shadow-xl text-sm">
             <p className="font-semibold text-white mb-1">{d.name}</p>
-            {d.role && <p className="text-slate-400 text-xs mb-2">{d.role}</p>}
+            {d.jobTitle && <p className="text-slate-400 text-xs mb-2">{d.jobTitle}</p>}
             <div className="space-y-1">
                 <div className="flex justify-between gap-6">
                     <span className="text-slate-500">Completion</span>
